@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cloadex-cli/cloadex/internal/plan"
-	"github.com/cloadex-cli/cloadex/internal/prompt"
-	"github.com/cloadex-cli/cloadex/internal/runner"
-	"github.com/cloadex-cli/cloadex/internal/ui"
+	"github.com/Ahmedlag/cloadex/internal/plan"
+	"github.com/Ahmedlag/cloadex/internal/prompt"
+	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/ui"
 )
 
 type TaskStatus string

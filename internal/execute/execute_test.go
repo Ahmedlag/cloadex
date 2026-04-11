@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloadex-cli/cloadex/internal/plan"
-	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/plan"
+	"github.com/Ahmedlag/cloadex/internal/runner"
 )
 
 func TestRoleLabel(t *testing.T) {

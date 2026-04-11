@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloadex-cli/cloadex/internal/runner"
-	"github.com/cloadex-cli/cloadex/internal/workspace"
+	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/workspace"
 )
 
 type Mode string

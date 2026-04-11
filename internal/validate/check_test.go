@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloadex-cli/cloadex/internal/plan"
-	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/plan"
+	"github.com/Ahmedlag/cloadex/internal/runner"
 )
 
 func TestRunCheck_PassingCommand(t *testing.T) {

@@ -45,13 +45,27 @@ Both CLIs must be authenticated and available in your `PATH`. cloadex checks for
 
 ## Install
 
-### go install (recommended)
+### One-command install (recommended)
+
+For macOS and Linux, use the installer script. It runs `go install`, resolves your Go bin directory, and adds it to your shell `PATH` automatically when needed.
 
 ```sh
-go install github.com/cloadex-cli/cloadex@latest
+curl -fsSL https://raw.githubusercontent.com/Ahmedlag/cloadex/main/install.sh | sh
 ```
 
-Make sure `$GOBIN` (or `$GOPATH/bin`) is on your `PATH`:
+If you already cloned the repo locally, you can run the same installer directly:
+
+```sh
+./install.sh
+```
+
+### go install (manual)
+
+```sh
+go install github.com/Ahmedlag/cloadex@latest
+```
+
+If you prefer to manage `PATH` yourself, make sure `$GOBIN` (or `$GOPATH/bin`) is on your `PATH`:
 
 ```sh
 # Add to your shell profile (~/.zshrc, ~/.bashrc, etc.)
@@ -60,12 +74,7 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 
 ### Homebrew (macOS / Linux)
 
-```sh
-brew tap cloadex-cli/cloadex
-brew install cloadex
-```
-
-> The Homebrew formula is available after the first tagged release.
+Homebrew packaging is not published yet. Until the tap exists, use the installer script above or install from source.
 
 ### Windows
 
@@ -83,7 +92,7 @@ $env:Path += ";$dest"
 ### From source
 
 ```sh
-git clone https://github.com/cloadex-cli/cloadex.git
+git clone https://github.com/Ahmedlag/cloadex.git
 cd cloadex
 make build      # produces ./cloadex
 make install    # installs to $GOPATH/bin (ensure it's on your PATH)

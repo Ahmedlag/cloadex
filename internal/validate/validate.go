@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloadex-cli/cloadex/internal/execute"
-	"github.com/cloadex-cli/cloadex/internal/persist"
-	"github.com/cloadex-cli/cloadex/internal/plan"
-	"github.com/cloadex-cli/cloadex/internal/prompt"
-	"github.com/cloadex-cli/cloadex/internal/runner"
-	"github.com/cloadex-cli/cloadex/internal/ui"
+	"github.com/Ahmedlag/cloadex/internal/execute"
+	"github.com/Ahmedlag/cloadex/internal/persist"
+	"github.com/Ahmedlag/cloadex/internal/plan"
+	"github.com/Ahmedlag/cloadex/internal/prompt"
+	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/ui"
 )
 
 // ValidationResult holds the full outcome of validation including checks and AI review.

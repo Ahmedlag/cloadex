@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloadex-cli/cloadex/internal/workspace"
+	"github.com/Ahmedlag/cloadex/internal/workspace"
 )
 
 const cloadexDir = workspace.DirName

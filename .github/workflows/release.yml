@@ -57,11 +57,11 @@ jobs:
         run: |
           mkdir -p dist
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            go build -ldflags "-X github.com/cloadex-cli/cloadex/cmd.version=${VERSION}" -o dist/cloadex.exe .
+            go build -ldflags "-X github.com/Ahmedlag/cloadex/cmd.version=${VERSION}" -o dist/cloadex.exe .
             cd dist
             zip -j "${{ matrix.artifact }}" cloadex.exe
           else
-            go build -ldflags "-X github.com/cloadex-cli/cloadex/cmd.version=${VERSION}" -o dist/cloadex .
+            go build -ldflags "-X github.com/Ahmedlag/cloadex/cmd.version=${VERSION}" -o dist/cloadex .
             tar -czf "dist/${{ matrix.artifact }}" -C dist cloadex
           fi
 

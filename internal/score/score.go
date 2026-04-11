@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/runner"
 )
 
 type Entry struct {

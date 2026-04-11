@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/runner"
 )
 
 func TestParseJSON_StructuredPlan(t *testing.T) {

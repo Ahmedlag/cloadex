@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/runner"
 )
 
 func TestAddPointAndLabel(t *testing.T) {

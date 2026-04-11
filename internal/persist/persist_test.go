@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/runner"
 )
 
 func TestSplitLines(t *testing.T) {

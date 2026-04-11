@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloadex-cli/cloadex/internal/runner"
-	"github.com/cloadex-cli/cloadex/internal/ui"
+	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/ui"
 )
 
 type Decision int

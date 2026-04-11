@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloadex-cli/cloadex/internal/workspace"
+	"github.com/Ahmedlag/cloadex/internal/workspace"
 )
 
 const configPath = ".cloadex/config.yaml"

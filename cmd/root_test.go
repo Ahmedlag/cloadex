@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloadex-cli/cloadex/internal/config"
-	"github.com/cloadex-cli/cloadex/internal/execute"
-	"github.com/cloadex-cli/cloadex/internal/session"
+	"github.com/Ahmedlag/cloadex/internal/config"
+	"github.com/Ahmedlag/cloadex/internal/execute"
+	"github.com/Ahmedlag/cloadex/internal/session"
 )
 
 func TestParseFlagsDefaults(t *testing.T) {

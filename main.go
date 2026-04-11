@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloadex-cli/cloadex/cmd"
+	"github.com/Ahmedlag/cloadex/cmd"
 )
 
 func main() {

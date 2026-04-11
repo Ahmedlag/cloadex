@@ -1,39 +1,39 @@
 class Cloadex < Formula
   desc "CLI that orchestrates Claude Code and OpenAI Codex into a collaborative coding workflow"
-  homepage "https://github.com/cloadex-cli/cloadex"
+  homepage "https://github.com/Ahmedlag/cloadex"
   version "0.1.0"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/cloadex-cli/cloadex/releases/download/v#{version}/cloadex-darwin-arm64.tar.gz"
+      url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-darwin-arm64.tar.gz"
       sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
     end
     on_intel do
-      url "https://github.com/cloadex-cli/cloadex/releases/download/v#{version}/cloadex-darwin-amd64.tar.gz"
+      url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-darwin-amd64.tar.gz"
       sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/cloadex-cli/cloadex/releases/download/v#{version}/cloadex-linux-arm64.tar.gz"
+      url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-linux-arm64.tar.gz"
       sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
     end
     on_intel do
-      url "https://github.com/cloadex-cli/cloadex/releases/download/v#{version}/cloadex-linux-amd64.tar.gz"
+      url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-linux-amd64.tar.gz"
       sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
     end
   end
 
-  head "https://github.com/cloadex-cli/cloadex.git", branch: "main"
+  head "https://github.com/Ahmedlag/cloadex.git", branch: "main"
 
   depends_on "go" => :build if build.head?
 
   def install
     if build.head?
       system "go", "build",
-             "-ldflags", "-X github.com/cloadex-cli/cloadex/cmd.version=HEAD-#{Utils.git_short_head}",
+             "-ldflags", "-X github.com/Ahmedlag/cloadex/cmd.version=HEAD-#{Utils.git_short_head}",
              "-o", bin/"cloadex", "."
     else
       bin.install "cloadex"

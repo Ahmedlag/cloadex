@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cloadex-cli/cloadex/internal/workspace"
+	"github.com/Ahmedlag/cloadex/internal/workspace"
 )
 
 func defaultRepoSummary(cwd string) string {

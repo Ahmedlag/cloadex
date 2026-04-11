@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloadex-cli/cloadex/internal/plan"
-	"github.com/cloadex-cli/cloadex/internal/ui"
+	"github.com/Ahmedlag/cloadex/internal/plan"
+	"github.com/Ahmedlag/cloadex/internal/ui"
 )
 
 // CheckResult holds the outcome of a single deterministic check command.

@@ -3,10 +3,10 @@ package validate
 import (
 	"testing"
 
-	"github.com/cloadex-cli/cloadex/internal/execute"
-	"github.com/cloadex-cli/cloadex/internal/persist"
-	"github.com/cloadex-cli/cloadex/internal/plan"
-	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/execute"
+	"github.com/Ahmedlag/cloadex/internal/persist"
+	"github.com/Ahmedlag/cloadex/internal/plan"
+	"github.com/Ahmedlag/cloadex/internal/runner"
 )
 
 func TestExtractStatus(t *testing.T) {

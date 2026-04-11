@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cloadex-cli/cloadex/internal/prompt"
-	"github.com/cloadex-cli/cloadex/internal/runner"
-	"github.com/cloadex-cli/cloadex/internal/ui"
+	"github.com/Ahmedlag/cloadex/internal/prompt"
+	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/ui"
 )
 
 const MaxRounds = 5

@@ -1,3 +1,3 @@
-module github.com/cloadex-cli/cloadex
+module github.com/Ahmedlag/cloadex
 
 go 1.26.2

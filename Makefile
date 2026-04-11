@@ -1,6 +1,6 @@
 BINARY_NAME=cloadex
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS=-ldflags "-X github.com/cloadex-cli/cloadex/cmd.version=$(VERSION)"
+LDFLAGS=-ldflags "-X github.com/Ahmedlag/cloadex/cmd.version=$(VERSION)"
 ZIP ?= zip -j
 TAR ?= tar -czf
 
