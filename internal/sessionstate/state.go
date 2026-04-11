@@ -1,0 +1,226 @@
+package sessionstate
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/cloadex-cli/cloadex/internal/runner"
+	"github.com/cloadex-cli/cloadex/internal/workspace"
+)
+
+type Mode string
+
+const (
+	ModeChat   Mode = "chat"
+	ModePlan   Mode = "plan"
+	ModeRun    Mode = "run"
+	ModeReview Mode = "review"
+)
+
+type Turn struct {
+	Role      string    `json:"role"`
+	Message   string    `json:"message"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type PinnedMemory struct {
+	Kind      string    `json:"kind"`
+	Value     string    `json:"value"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Event struct {
+	Kind      string    `json:"kind"`
+	Stage     string    `json:"stage,omitempty"`
+	Actor     string    `json:"actor,omitempty"`
+	Detail    string    `json:"detail"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type State struct {
+	Version       int                               `json:"version"`
+	RepoPath      string                            `json:"repo_path"`
+	Branch        string                            `json:"branch,omitempty"`
+	Mode          Mode                              `json:"mode"`
+	RepoSummary   string                            `json:"repo_summary,omitempty"`
+	ActiveGoal    string                            `json:"active_goal,omitempty"`
+	LastPlan      string                            `json:"last_plan,omitempty"`
+	LastRunID     string                            `json:"last_run_id,omitempty"`
+	AgentSessions map[string]runner.SessionSnapshot `json:"agent_sessions,omitempty"`
+	Turns         []Turn                            `json:"turns,omitempty"`
+	Pinned        []PinnedMemory                    `json:"pinned,omitempty"`
+	Events        []Event                           `json:"events,omitempty"`
+	UpdatedAt     time.Time                         `json:"updated_at"`
+}
+
+const fileName = "session.json"
+
+func LoadOrInit() (*State, error) {
+	path, err := path()
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(path)
+	if err == nil {
+		var state State
+		if err := json.Unmarshal(data, &state); err != nil {
+			return nil, fmt.Errorf("parse session state: %w", err)
+		}
+		if state.Version == 0 {
+			state.Version = 1
+		}
+		if state.Mode == "" {
+			state.Mode = ModeChat
+		}
+		if state.AgentSessions == nil {
+			state.AgentSessions = map[string]runner.SessionSnapshot{}
+		}
+		return &state, nil
+	}
+	if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("read session state: %w", err)
+	}
+
+	cwd, _ := os.Getwd()
+	state := &State{
+		Version:       1,
+		RepoPath:      cwd,
+		Mode:          ModeChat,
+		RepoSummary:   defaultRepoSummary(cwd),
+		Branch:        detectBranch(cwd),
+		AgentSessions: map[string]runner.SessionSnapshot{},
+		UpdatedAt:     time.Now(),
+	}
+	return state, Save(state)
+}
+
+func Save(state *State) error {
+	if state == nil {
+		return nil
+	}
+	p, err := path()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		return fmt.Errorf("create session dir: %w", err)
+	}
+	state.UpdatedAt = time.Now()
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal session state: %w", err)
+	}
+	return os.WriteFile(p, data, 0o644)
+}
+
+func (s *State) RecordTurn(role string, message string) {
+	if s == nil || strings.TrimSpace(message) == "" {
+		return
+	}
+	s.Turns = append(s.Turns, Turn{
+		Role:      role,
+		Message:   strings.TrimSpace(message),
+		CreatedAt: time.Now(),
+	})
+	if len(s.Turns) > 20 {
+		s.Turns = s.Turns[len(s.Turns)-20:]
+	}
+}
+
+func (s *State) Pin(kind string, value string) {
+	if s == nil || strings.TrimSpace(value) == "" {
+		return
+	}
+	s.Pinned = append(s.Pinned, PinnedMemory{
+		Kind:      kind,
+		Value:     strings.TrimSpace(value),
+		CreatedAt: time.Now(),
+	})
+	if len(s.Pinned) > 20 {
+		s.Pinned = s.Pinned[len(s.Pinned)-20:]
+	}
+}
+
+func (s *State) RecordEvent(kind string, stage string, actor string, detail string) {
+	if s == nil || strings.TrimSpace(detail) == "" {
+		return
+	}
+	s.Events = append(s.Events, Event{
+		Kind:      kind,
+		Stage:     strings.TrimSpace(stage),
+		Actor:     strings.TrimSpace(actor),
+		Detail:    strings.TrimSpace(detail),
+		CreatedAt: time.Now(),
+	})
+	if len(s.Events) > 40 {
+		s.Events = s.Events[len(s.Events)-40:]
+	}
+}
+
+func (s *State) SummaryForPrompt() string {
+	if s == nil {
+		return ""
+	}
+	var parts []string
+	if s.RepoSummary != "" {
+		parts = append(parts, "Repo summary:\n"+s.RepoSummary)
+	}
+	if s.ActiveGoal != "" {
+		parts = append(parts, "Active goal:\n"+s.ActiveGoal)
+	}
+	if len(s.Pinned) > 0 {
+		var pinned []string
+		for _, item := range s.Pinned {
+			pinned = append(pinned, fmt.Sprintf("- %s: %s", item.Kind, item.Value))
+		}
+		parts = append(parts, "Pinned memory:\n"+strings.Join(pinned, "\n"))
+	}
+	if len(s.Turns) > 0 {
+		start := 0
+		if len(s.Turns) > 6 {
+			start = len(s.Turns) - 6
+		}
+		var turns []string
+		for _, turn := range s.Turns[start:] {
+			turns = append(turns, fmt.Sprintf("- %s: %s", turn.Role, turn.Message))
+		}
+		parts = append(parts, "Recent turns:\n"+strings.Join(turns, "\n"))
+	}
+	if len(s.Events) > 0 {
+		start := 0
+		if len(s.Events) > 6 {
+			start = len(s.Events) - 6
+		}
+		var events []string
+		for _, event := range s.Events[start:] {
+			label := event.Kind
+			if event.Stage != "" {
+				label += "/" + event.Stage
+			}
+			if event.Actor != "" {
+				label += "@" + event.Actor
+			}
+			events = append(events, fmt.Sprintf("- %s: %s", label, event.Detail))
+		}
+		parts = append(parts, "Recent runtime events:\n"+strings.Join(events, "\n"))
+	}
+	return strings.Join(parts, "\n\n")
+}
+
+func ValidMode(raw string) (Mode, bool) {
+	mode := Mode(strings.ToLower(strings.TrimSpace(raw)))
+	switch mode {
+	case ModeChat, ModePlan, ModeRun, ModeReview:
+		return mode, true
+	default:
+		return "", false
+	}
+}
+
+func path() (string, error) {
+	return workspace.Path(fileName)
+}

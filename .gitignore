@@ -1,0 +1,5 @@
+cloadex
+dist/
+*.exe
+.cloadex/
+.gocache/

@@ -1,0 +1,62 @@
+package ui
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+// Spinner shows an animated progress indicator while a long-running operation is in progress.
+type Spinner struct {
+	message string
+	stop    chan struct{}
+	done    chan struct{}
+	mu      sync.Mutex
+	start   time.Time
+}
+
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// NewSpinner creates and starts a spinner with the given message.
+func NewSpinner(message string) *Spinner {
+	s := &Spinner{
+		message: message,
+		stop:    make(chan struct{}),
+		done:    make(chan struct{}),
+		start:   time.Now(),
+	}
+	go s.run()
+	return s
+}
+
+func (s *Spinner) run() {
+	defer close(s.done)
+	ticker := time.NewTicker(80 * time.Millisecond)
+	defer ticker.Stop()
+
+	i := 0
+	for {
+		select {
+		case <-s.stop:
+			// Clear the spinner line
+			fmt.Printf("\r\033[K")
+			return
+		case <-ticker.C:
+			elapsed := time.Since(s.start).Truncate(time.Second)
+			frame := spinnerFrames[i%len(spinnerFrames)]
+			fmt.Printf("\r%s%s%s %s %s(%s)%s", Bold, SystemColor, frame, s.message, Dim, elapsed, Reset)
+			i++
+		}
+	}
+}
+
+// Stop stops the spinner and optionally prints a completion message.
+func (s *Spinner) Stop(completionMsg string) time.Duration {
+	close(s.stop)
+	<-s.done
+	elapsed := time.Since(s.start)
+	if completionMsg != "" {
+		PrintSystem("%s %s(%s)%s", completionMsg, Dim, elapsed.Truncate(time.Millisecond), Reset)
+	}
+	return elapsed
+}
