@@ -407,15 +407,48 @@ func classifyExitError(ai AI, err error, stderrText string) *RunError {
 		exitCode = exitErr.ExitCode()
 	}
 
+	stderrText = strings.TrimSpace(stderrText)
+	if authMessage, ok := classifyAuthFailure(ai, stderrText); ok {
+		return &RunError{
+			AI:        ai,
+			Retryable: false,
+			ExitCode:  exitCode,
+			Stderr:    authMessage,
+			Cause:     errors.New("authentication required"),
+		}
+	}
+
 	retryable := isRetryableFailure(exitCode, stderrText)
 
 	return &RunError{
 		AI:        ai,
 		Retryable: retryable,
 		ExitCode:  exitCode,
-		Stderr:    strings.TrimSpace(stderrText),
+		Stderr:    stderrText,
 		Cause:     err,
 	}
+}
+
+func classifyAuthFailure(ai AI, stderr string) (string, bool) {
+	lower := strings.ToLower(stderr)
+	switch ai {
+	case Codex:
+		if strings.Contains(lower, "invalid refresh token") ||
+			strings.Contains(lower, "invalid_grant") ||
+			strings.Contains(lower, "tokenrefreshfailed") {
+			return "Codex authentication expired. Run `codex logout` and `codex login`, then try again.", true
+		}
+		if strings.Contains(lower, "authentication error") ||
+			strings.Contains(lower, "not logged in") {
+			return "Codex authentication is required. Run `codex login`, then try again.", true
+		}
+	case Claude:
+		if strings.Contains(lower, "authentication error") ||
+			strings.Contains(lower, "not logged in") {
+			return "Claude authentication is required. Run `claude login`, then try again.", true
+		}
+	}
+	return "", false
 }
 
 // isRetryableFailure determines if a failure is transient and worth retrying.

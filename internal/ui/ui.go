@@ -36,6 +36,7 @@ var (
 	verbose     bool
 	claudeLabel = "Claude"
 	codexLabel  = "Codex"
+	streamingAI = ""
 )
 
 // SetVerbose enables or disables verbose logging.
@@ -69,20 +70,21 @@ func PrintClaude(format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s%s%s%s%s%s  %s\n", Bold, ClaudeColor, claudeLabel, Reset, Muted, "›", msg)
+	printSpeakerBlockLocked(shortLabel(claudeLabel), ClaudeColor, msg)
 }
 
 func PrintCodex(format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()
 	msg := fmt.Sprintf(format, args...)
-	fmt.Printf("%s%s%s%s%s%s  %s\n", Bold, CodexColor, codexLabel, Reset, Muted, "›", msg)
+	printSpeakerBlockLocked(shortLabel(codexLabel), CodexColor, msg)
 }
 
 func PrintSystem(format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()
 	msg := fmt.Sprintf(format, args...)
+	endStreamLocked()
 	fmt.Printf("%s%scloadex%s%s  %s\n", Dim, SystemColor, Reset, Dim, msg)
 }
 
@@ -90,6 +92,7 @@ func PrintError(format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()
 	msg := fmt.Sprintf(format, args...)
+	endStreamLocked()
 	fmt.Printf("%s%serror%s%s    %s\n", Bold, ErrorColor, Reset, Dim, msg)
 }
 
@@ -97,6 +100,7 @@ func PrintSuccess(format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()
 	msg := fmt.Sprintf(format, args...)
+	endStreamLocked()
 	fmt.Printf("%s%sdone%s%s     %s\n", Bold, SuccessColor, Reset, Dim, msg)
 }
 
@@ -104,40 +108,46 @@ func PrintUser(format string, args ...any) {
 	mu.Lock()
 	defer mu.Unlock()
 	msg := fmt.Sprintf(format, args...)
+	endStreamLocked()
 	fmt.Printf("%s%syou%s%s      %s\n", Bold, UserColor, Reset, Dim, msg)
 }
 
 func StreamClaude(line string) {
 	mu.Lock()
 	defer mu.Unlock()
-	fmt.Printf("%s%s%s%s%s%s  %s\n", Bold, ClaudeColor, claudeLabel, Reset, Muted, "›", line)
+	streamSpeakerLocked("claude", shortLabel(claudeLabel), ClaudeColor, line)
 }
 
 func StreamCodex(line string) {
 	mu.Lock()
 	defer mu.Unlock()
-	fmt.Printf("%s%s%s%s%s%s  %s\n", Bold, CodexColor, codexLabel, Reset, Muted, "›", line)
+	streamSpeakerLocked("codex", shortLabel(codexLabel), CodexColor, line)
 }
 
 func Divider() {
 	mu.Lock()
 	defer mu.Unlock()
+	endStreamLocked()
 	fmt.Printf("%s%s%s%s\n", Dim, Muted, strings.Repeat("─", 52), Reset)
 }
 
 func Banner() {
+	mu.Lock()
+	defer mu.Unlock()
+	endStreamLocked()
 	fmt.Printf("%s%scloadex%s%s  Claude + Codex — better together%s\n\n", Bold, SystemColor, Reset, Dim, Reset)
 }
 
 func PhaseHeader(phase int, name string) {
 	mu.Lock()
 	defer mu.Unlock()
+	endStreamLocked()
 	fmt.Println()
 	fmt.Printf("%s%sphase %d%s%s  %s%s%s\n", Dim, Muted, phase, Reset, Bold, SystemColor, name, Reset)
 	fmt.Printf("%s%s%s%s\n\n", Dim, Muted, strings.Repeat("─", 28), Reset)
 }
 
-func SessionHeader(repo string, branch string, mode string, claude string, codex string) string {
+func SessionHeader(repo string, branch string, claude string, codex string) string {
 	var top []string
 	top = append(top, fmt.Sprintf("%s%scloadex%s", Bold, SystemColor, Reset))
 	if repo != "" {
@@ -145,9 +155,6 @@ func SessionHeader(repo string, branch string, mode string, claude string, codex
 	}
 	if branch != "" {
 		top = append(top, fmt.Sprintf("%s%s%s", Dim, branch, Reset))
-	}
-	if mode != "" {
-		top = append(top, chip(strings.ToUpper(mode)))
 	}
 
 	var bottom []string
@@ -166,9 +173,76 @@ func SessionHeader(repo string, branch string, mode string, claude string, codex
 }
 
 func SessionPrompt(mode string) string {
-	return fmt.Sprintf("%s %s%s›%s ", chip(strings.ToUpper(mode)), Bold, UserColor, Reset)
+	return fmt.Sprintf("%s  %s%s›%s ", ModeTabs(mode), Bold, UserColor, Reset)
+}
+
+func ModeTabs(active string) string {
+	active = strings.ToLower(strings.TrimSpace(active))
+	modes := []string{"chat", "planning", "execution"}
+	rendered := make([]string, 0, len(modes))
+	for _, mode := range modes {
+		rendered = append(rendered, modeChip(strings.ToUpper(mode), mode == active))
+	}
+	return strings.Join(rendered, " ")
 }
 
 func chip(text string) string {
 	return fmt.Sprintf("%s%s%s %s %s", Bold, PromptBg, PromptFg, text, Reset)
+}
+
+func modeChip(text string, active bool) string {
+	if active {
+		return chip(text)
+	}
+	return fmt.Sprintf("%s[%s]%s", Muted, text, Reset)
+}
+
+func streamSpeakerLocked(id string, tag string, color string, line string) {
+	if streamingAI != id {
+		endStreamLocked()
+		fmt.Println()
+		fmt.Printf("%s%s%s%s\n", Bold, color, tag, Reset)
+		streamingAI = id
+	}
+	for _, part := range strings.Split(line, "\n") {
+		if strings.TrimSpace(part) == "" {
+			fmt.Println()
+			continue
+		}
+		fmt.Printf("%s  %s\n", Muted, part)
+	}
+}
+
+func printSpeakerBlockLocked(tag string, color string, msg string) {
+	endStreamLocked()
+	fmt.Println()
+	fmt.Printf("%s%s%s%s\n", Bold, color, tag, Reset)
+	for _, part := range strings.Split(msg, "\n") {
+		if strings.TrimSpace(part) == "" {
+			fmt.Println()
+			continue
+		}
+		fmt.Printf("%s  %s\n", Muted, part)
+	}
+	fmt.Println()
+}
+
+func endStreamLocked() {
+	if streamingAI == "" {
+		return
+	}
+	fmt.Println()
+	streamingAI = ""
+}
+
+func shortLabel(label string) string {
+	lower := strings.ToLower(label)
+	switch {
+	case strings.Contains(lower, "claude"):
+		return "Claude"
+	case strings.Contains(lower, "codex"):
+		return "Codex"
+	default:
+		return label
+	}
 }

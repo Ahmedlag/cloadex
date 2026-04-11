@@ -15,10 +15,9 @@ import (
 type Mode string
 
 const (
-	ModeChat   Mode = "chat"
-	ModePlan   Mode = "plan"
-	ModeRun    Mode = "run"
-	ModeReview Mode = "review"
+	ModeChat      Mode = "chat"
+	ModePlanning  Mode = "planning"
+	ModeExecution Mode = "execution"
 )
 
 type Turn struct {
@@ -73,7 +72,9 @@ func LoadOrInit() (*State, error) {
 		if state.Version == 0 {
 			state.Version = 1
 		}
-		if state.Mode == "" {
+		if normalized, ok := normalizeMode(string(state.Mode)); ok {
+			state.Mode = normalized
+		} else {
 			state.Mode = ModeChat
 		}
 		if state.AgentSessions == nil {
@@ -179,15 +180,33 @@ func (s *State) SummaryForPrompt() string {
 }
 
 func ValidMode(raw string) (Mode, bool) {
-	mode := Mode(strings.ToLower(strings.TrimSpace(raw)))
-	switch mode {
-	case ModeChat, ModePlan, ModeRun, ModeReview:
-		return mode, true
-	default:
-		return "", false
-	}
+	return normalizeMode(raw)
 }
 
 func path() (string, error) {
 	return workspace.Path(fileName)
+}
+
+func NextMode(mode Mode) Mode {
+	switch mode {
+	case ModeChat:
+		return ModePlanning
+	case ModePlanning:
+		return ModeExecution
+	default:
+		return ModeChat
+	}
+}
+
+func normalizeMode(raw string) (Mode, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case string(ModeChat), "review":
+		return ModeChat, true
+	case string(ModePlanning), "plan":
+		return ModePlanning, true
+	case string(ModeExecution), "run":
+		return ModeExecution, true
+	default:
+		return "", false
+	}
 }

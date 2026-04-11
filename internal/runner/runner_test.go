@@ -290,6 +290,26 @@ func TestClassifyStartError(t *testing.T) {
 	})
 }
 
+func TestClassifyExitError_CodexInvalidRefreshToken(t *testing.T) {
+	err := classifyExitError(Codex, errors.New("signal: killed"), `ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))`)
+	if err.Retryable {
+		t.Fatal("auth failure should not be retryable")
+	}
+	if !strings.Contains(err.Error(), "codex logout") || !strings.Contains(err.Error(), "codex login") {
+		t.Fatalf("expected actionable codex auth guidance, got: %s", err.Error())
+	}
+	if strings.Contains(strings.ToLower(err.Error()), "invalid_grant") {
+		t.Fatalf("expected raw transport error to be suppressed, got: %s", err.Error())
+	}
+}
+
+func TestClassifyExitError_CodexNotLoggedIn(t *testing.T) {
+	err := classifyExitError(Codex, errors.New("exit status 1"), "authentication error: not logged in")
+	if !strings.Contains(err.Error(), "codex login") {
+		t.Fatalf("expected codex login guidance, got: %s", err.Error())
+	}
+}
+
 func TestRetryDelay(t *testing.T) {
 	d1 := retryDelay(1)
 	d2 := retryDelay(2)

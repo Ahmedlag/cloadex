@@ -196,6 +196,12 @@ func TestCustomSlashCommand(t *testing.T) {
 	}
 }
 
+func TestCycleModeCommand(t *testing.T) {
+	if !isExitInput("exit") || !isExitInput("quit") {
+		t.Fatal("expected bare exit helpers to be recognized")
+	}
+}
+
 func TestResumeCommand(t *testing.T) {
 	in := strings.NewReader("/resume\n/exit\n")
 	var out bytes.Buffer
@@ -275,6 +281,36 @@ func TestPromptRenderer(t *testing.T) {
 	_ = s.Run()
 	if !strings.Contains(out.String(), "cloadex[chat]> ") {
 		t.Fatal("expected rendered prompt")
+	}
+}
+
+func TestHandleLineDispatchesPrompt(t *testing.T) {
+	var got string
+	s := &Session{
+		OnPrompt: func(prompt string) error {
+			got = prompt
+			return nil
+		},
+	}
+	var out bytes.Buffer
+	done, err := s.handleLine(&out, "hello")
+	if err != nil || done {
+		t.Fatalf("handleLine returned done=%v err=%v", done, err)
+	}
+	if got != "hello" {
+		t.Fatalf("got %q, want hello", got)
+	}
+}
+
+func TestHandleLineRecognizesBareExit(t *testing.T) {
+	s := &Session{}
+	var out bytes.Buffer
+	done, err := s.handleLine(&out, "exit")
+	if err != nil {
+		t.Fatalf("handleLine error: %v", err)
+	}
+	if !done {
+		t.Fatal("expected exit to terminate session")
 	}
 }
 

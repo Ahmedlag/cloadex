@@ -34,7 +34,7 @@ func TestLoadOrInitCreatesState(t *testing.T) {
 func TestSummaryForPrompt(t *testing.T) {
 	state := &State{
 		RepoSummary:   "repo",
-		Mode:          ModeReview,
+		Mode:          ModePlanning,
 		LastRunID:     "20260411-120000",
 		AgentSessions: map[string]runner.SessionSnapshot{},
 	}
@@ -42,7 +42,7 @@ func TestSummaryForPrompt(t *testing.T) {
 	state.RecordTurn("user", "fix auth")
 	state.RecordEvent("observer_warn", "execution", "codex", "suspicious drift")
 	summary := state.SummaryForPrompt()
-	for _, want := range []string{"repo", "review", "20260411-120000"} {
+	for _, want := range []string{"repo", "planning", "20260411-120000"} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary missing %q", want)
 		}
@@ -73,6 +73,15 @@ func TestValidMode(t *testing.T) {
 	if _, ok := ValidMode("chat"); !ok {
 		t.Fatal("expected chat mode to be valid")
 	}
+	if mode, ok := ValidMode("plan"); !ok || mode != ModePlanning {
+		t.Fatalf("expected plan alias to map to planning, got %q", mode)
+	}
+	if mode, ok := ValidMode("run"); !ok || mode != ModeExecution {
+		t.Fatalf("expected run alias to map to execution, got %q", mode)
+	}
+	if mode, ok := ValidMode("review"); !ok || mode != ModeChat {
+		t.Fatalf("expected review alias to map to chat, got %q", mode)
+	}
 	if _, ok := ValidMode("bogus"); ok {
 		t.Fatal("expected bogus mode to be invalid")
 	}
@@ -90,7 +99,7 @@ func TestLoadOrInitMigratesLegacySessionFile(t *testing.T) {
 	}
 	legacyState := State{
 		Version:       1,
-		Mode:          ModeReview,
+		Mode:          "review",
 		RepoPath:      tmp,
 		AgentSessions: map[string]runner.SessionSnapshot{},
 	}
@@ -106,14 +115,26 @@ func TestLoadOrInitMigratesLegacySessionFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadOrInit: %v", err)
 	}
-	if state.Mode != ModeReview {
-		t.Fatalf("mode = %s, want %s", state.Mode, ModeReview)
+	if state.Mode != ModeChat {
+		t.Fatalf("mode = %s, want %s", state.Mode, ModeChat)
 	}
 	if _, err := os.Stat(filepath.Join(".cloadex", fileName)); err != nil {
 		t.Fatalf("expected migrated session file: %v", err)
 	}
 	if _, err := os.Stat(".wizdo"); !os.IsNotExist(err) {
 		t.Fatalf("expected legacy .wizdo dir removed after migration, got %v", err)
+	}
+}
+
+func TestNextModeCycles(t *testing.T) {
+	if got := NextMode(ModeChat); got != ModePlanning {
+		t.Fatalf("NextMode(chat) = %s, want %s", got, ModePlanning)
+	}
+	if got := NextMode(ModePlanning); got != ModeExecution {
+		t.Fatalf("NextMode(planning) = %s, want %s", got, ModeExecution)
+	}
+	if got := NextMode(ModeExecution); got != ModeChat {
+		t.Fatalf("NextMode(execution) = %s, want %s", got, ModeChat)
 	}
 }
 

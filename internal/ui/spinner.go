@@ -11,7 +11,7 @@ type Spinner struct {
 	message string
 	stop    chan struct{}
 	done    chan struct{}
-	mu      sync.Mutex
+	once    sync.Once
 	start   time.Time
 }
 
@@ -39,12 +39,16 @@ func (s *Spinner) run() {
 		select {
 		case <-s.stop:
 			// Clear the spinner line
+			mu.Lock()
 			fmt.Printf("\r\033[K")
+			mu.Unlock()
 			return
 		case <-ticker.C:
 			elapsed := time.Since(s.start).Truncate(time.Second)
 			frame := spinnerFrames[i%len(spinnerFrames)]
+			mu.Lock()
 			fmt.Printf("\r%s%s%s %s %s(%s)%s", Bold, SystemColor, frame, s.message, Dim, elapsed, Reset)
+			mu.Unlock()
 			i++
 		}
 	}
@@ -52,7 +56,9 @@ func (s *Spinner) run() {
 
 // Stop stops the spinner and optionally prints a completion message.
 func (s *Spinner) Stop(completionMsg string) time.Duration {
-	close(s.stop)
+	s.once.Do(func() {
+		close(s.stop)
+	})
 	<-s.done
 	elapsed := time.Since(s.start)
 	if completionMsg != "" {

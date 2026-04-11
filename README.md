@@ -108,31 +108,33 @@ cloadex [options] <prompt>      # run a single prompt
 cloadex <command>
 ```
 
-When invoked with no arguments in an interactive terminal, cloadex launches a live session screen showing the active repo, branch, mode, and both AI score labels. The prompt reflects the active mode, for example `cloadex[chat]>`. Type `/help` for available slash commands or `/exit` to quit.
+When invoked with no arguments in an interactive terminal, cloadex launches a live session shell showing the active repo, branch, mode tabs, and both AI score labels. The prompt reflects the active mode tabs directly, and `Shift-Tab` cycles through the available modes. Type `/help` for available slash commands or `/exit` to quit.
 
 ### Session Modes
 
 | Mode | Purpose |
 |---|---|
-| `chat` | Default continuous session mode |
-| `plan` | Plan-only mode; entering a prompt creates and reviews a plan without execution |
-| `run` | Full execution mode |
-| `review` | Review the current workspace and recent changes |
+| `chat` | Read-only discussion and repository Q&A |
+| `planning` | Read-only planning mode for shaping a full plan and asking product/architecture questions |
+| `execution` | Full mode that can discuss, plan, and modify code |
 
 ### Slash Commands
 
 | Command | Description |
 |---|---|
-| `/mode <chat\|plan\|run\|review>` | Switch session mode |
-| `/plan [prompt]` | Show the last approved plan or run a prompt in plan mode |
-| `/run [prompt]` | Switch to run mode or execute a prompt immediately |
-| `/review [prompt]` | Switch to review mode or review immediately |
+| `/mode <chat\|planning\|execution>` | Switch session mode |
+| `/plan [prompt]` | Show the last approved plan or run a prompt in planning mode |
+| `/run [prompt]` | Switch to execution mode or execute a prompt immediately |
+| `/review [prompt]` | Alias for read-only chat/review behavior |
 | `/score` | Show the global AI score labels |
 | `/agents` | Show AI labels and roles |
 | `/diff` | Show git status / diff summary |
 | `/resume` | Resume the most recent interrupted run |
 | `/help` | Show session help |
 | `/exit` | Exit the session |
+
+`Shift-Tab` cycles the active session mode in this order:
+`chat -> planning -> execution -> chat`
 
 ### Options
 

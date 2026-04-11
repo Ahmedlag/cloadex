@@ -267,6 +267,10 @@ func cmdSession() error {
 		saveAgentSessions(state, agentSessions)
 		return err
 	}
+	sess.OnCycleMode = func() error {
+		state.Mode = sessionstate.NextMode(state.Mode)
+		return sessionstate.Save(state)
+	}
 	if sess.In == nil {
 		sess.In = os.Stdin
 	}
@@ -326,15 +330,86 @@ func run(ctx context.Context, userPrompt string, opts config.Options, setRunID f
 
 func runForSession(ctx context.Context, userPrompt string, opts config.Options, setRunID func(string), state *sessionstate.State) error {
 	switch state.Mode {
-	case sessionstate.ModePlan:
-		planOpts := opts
-		planOpts.DryRun = true
-		return runWithState(ctx, userPrompt, planOpts, setRunID, state)
-	case sessionstate.ModeReview:
-		return runReview(ctx, userPrompt, state)
-	default:
+	case sessionstate.ModePlanning:
+		return runPlanning(ctx, userPrompt, state)
+	case sessionstate.ModeExecution:
 		return runWithState(ctx, userPrompt, opts, setRunID, state)
+	default:
+		return runChat(ctx, userPrompt, state)
 	}
+}
+
+func runChat(ctx context.Context, userPrompt string, state *sessionstate.State) error {
+	refreshAILabels()
+	if err := checkDependencies(); err != nil {
+		return err
+	}
+	wsContext := prompt.WorkspaceContext()
+	summary := ""
+	if state != nil {
+		summary = state.SummaryForPrompt()
+	}
+	ui.PrintSystem("CHAT mode is read-only.")
+	spinner := ui.NewSpinner("CHAT thinking…")
+	var spinnerOnce sync.Once
+	stopSpinner := func() {
+		spinnerOnce.Do(func() {
+			spinner.Stop("")
+		})
+	}
+	result := runner.Run(ctx, runner.Codex, prompt.ChatSession(wsContext, summary, userPrompt), func(ai runner.AI, line string) {
+		stopSpinner()
+		ui.StreamCodex(line)
+	})
+	stopSpinner()
+	if result.Err != nil {
+		return result.Err
+	}
+	if state != nil {
+		state.ActiveGoal = userPrompt
+		state.RecordTurn("user", userPrompt)
+		state.RecordTurn("chat", truncateForMemory(result.Output))
+		state.RecordEvent("phase_complete", "chat", "codex", "Chat response completed.")
+		return sessionstate.Save(state)
+	}
+	return nil
+}
+
+func runPlanning(ctx context.Context, userPrompt string, state *sessionstate.State) error {
+	refreshAILabels()
+	if err := checkDependencies(); err != nil {
+		return err
+	}
+	wsContext := prompt.WorkspaceContext()
+	summary := ""
+	if state != nil {
+		summary = state.SummaryForPrompt()
+	}
+	ui.PrintSystem("PLANNING mode is read-only.")
+	spinner := ui.NewSpinner("PLANNING thinking…")
+	var spinnerOnce sync.Once
+	stopSpinner := func() {
+		spinnerOnce.Do(func() {
+			spinner.Stop("")
+		})
+	}
+	result := runner.Run(ctx, runner.Claude, prompt.PlanningSession(wsContext, summary, userPrompt), func(ai runner.AI, line string) {
+		stopSpinner()
+		ui.StreamClaude(line)
+	})
+	stopSpinner()
+	if result.Err != nil {
+		return result.Err
+	}
+	if state != nil {
+		state.ActiveGoal = userPrompt
+		state.LastPlan = result.Output
+		state.RecordTurn("user", userPrompt)
+		state.RecordTurn("planning", truncateForMemory(result.Output))
+		state.RecordEvent("phase_complete", "planning", "claude", "Planning response completed.")
+		return sessionstate.Save(state)
+	}
+	return nil
 }
 
 func runWithState(ctx context.Context, userPrompt string, opts config.Options, setRunID func(string), state *sessionstate.State) error {
@@ -823,19 +898,19 @@ func handleSessionCommand(command session.SlashCommand, args string, state *sess
 			fmt.Println(state.LastPlan)
 			return nil
 		}
-		return runCommandInSession(rc, state, args, sessionstate.ModePlan)
+		return runCommandInSession(rc, state, args, sessionstate.ModePlanning)
 	case session.CmdRun:
 		if strings.TrimSpace(args) == "" {
-			state.Mode = sessionstate.ModeRun
+			state.Mode = sessionstate.ModeExecution
 			return sessionstate.Save(state)
 		}
-		return runCommandInSession(rc, state, args, sessionstate.ModeRun)
+		return runCommandInSession(rc, state, args, sessionstate.ModeExecution)
 	case session.CmdReview:
 		if strings.TrimSpace(args) == "" {
-			state.Mode = sessionstate.ModeReview
+			state.Mode = sessionstate.ModeChat
 			return sessionstate.Save(state)
 		}
-		return runCommandInSession(rc, state, args, sessionstate.ModeReview)
+		return runCommandInSession(rc, state, args, sessionstate.ModeChat)
 	default:
 		return fmt.Errorf("unknown command %s", command)
 	}
@@ -873,12 +948,10 @@ func sessionHeader(state *sessionstate.State) string {
 		repo = filepath.Base(state.RepoPath)
 	}
 	branch := ""
-	mode := ""
 	if state != nil {
 		branch = state.Branch
-		mode = string(state.Mode)
 	}
-	return ui.SessionHeader(repo, branch, mode, score.Label(runner.Claude), score.Label(runner.Codex))
+	return ui.SessionHeader(repo, branch, score.Label(runner.Claude), score.Label(runner.Codex))
 }
 
 func printGitDiffSummary() error {
