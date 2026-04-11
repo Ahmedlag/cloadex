@@ -34,6 +34,9 @@ func Path(elem ...string) (string, error) {
 func dirFrom(cwd string) (string, error) {
 	current := filepath.Join(cwd, DirName)
 	if _, err := os.Stat(current); err == nil {
+		if err := os.Chmod(current, 0o700); err != nil {
+			return "", fmt.Errorf("secure workspace dir: %w", err)
+		}
 		return current, nil
 	} else if !os.IsNotExist(err) {
 		return "", fmt.Errorf("stat workspace dir: %w", err)
@@ -44,10 +47,30 @@ func dirFrom(cwd string) (string, error) {
 		if err := os.Rename(legacy, current); err != nil {
 			return "", fmt.Errorf("migrate legacy workspace dir: %w", err)
 		}
+		if err := os.Chmod(current, 0o700); err != nil {
+			return "", fmt.Errorf("secure migrated workspace dir: %w", err)
+		}
 		return current, nil
 	} else if !os.IsNotExist(err) {
 		return "", fmt.Errorf("stat legacy workspace dir: %w", err)
 	}
 
 	return current, nil
+}
+
+func EnsurePrivateDir(path string) error {
+	if err := os.MkdirAll(path, 0o700); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o700)
+}
+
+func WritePrivateFile(path string, data []byte) error {
+	if err := EnsurePrivateDir(filepath.Dir(path)); err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0o600)
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 )
 
 const cloadexDir = workspace.DirName
+
+var runIDPattern = regexp.MustCompile(`^\d{8}-\d{6}$`)
 
 // RunSummary holds metadata about a persisted run for listing purposes.
 type RunSummary struct {
@@ -41,7 +44,7 @@ func SaveRun(prompt, plan, debateHistory, execOutput, validationOutput string) (
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := workspace.EnsurePrivateDir(dir); err != nil {
 		return "", fmt.Errorf("create run dir: %w", err)
 	}
 
@@ -58,7 +61,7 @@ func SaveRun(prompt, plan, debateHistory, execOutput, validationOutput string) (
 			continue
 		}
 		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		if err := workspace.WritePrivateFile(path, []byte(content)); err != nil {
 			return "", fmt.Errorf("write %s: %w", name, err)
 		}
 	}
@@ -252,5 +255,8 @@ func runsDir() (string, error) {
 }
 
 func runDir(id string) (string, error) {
+	if !runIDPattern.MatchString(id) {
+		return "", fmt.Errorf("invalid run ID: %s", id)
+	}
 	return workspace.Path("runs", id)
 }

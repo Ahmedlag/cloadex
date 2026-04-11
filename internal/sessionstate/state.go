@@ -106,7 +106,7 @@ func Save(state *State) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := workspace.EnsurePrivateDir(filepath.Dir(p)); err != nil {
 		return fmt.Errorf("create session dir: %w", err)
 	}
 	state.UpdatedAt = time.Now()
@@ -114,7 +114,7 @@ func Save(state *State) error {
 	if err != nil {
 		return fmt.Errorf("marshal session state: %w", err)
 	}
-	return os.WriteFile(p, data, 0o644)
+	return workspace.WritePrivateFile(p, data)
 }
 
 func (s *State) RecordTurn(role string, message string) {
@@ -169,44 +169,11 @@ func (s *State) SummaryForPrompt() string {
 	if s.RepoSummary != "" {
 		parts = append(parts, "Repo summary:\n"+s.RepoSummary)
 	}
-	if s.ActiveGoal != "" {
-		parts = append(parts, "Active goal:\n"+s.ActiveGoal)
+	if s.Mode != "" {
+		parts = append(parts, fmt.Sprintf("Session mode: %s", s.Mode))
 	}
-	if len(s.Pinned) > 0 {
-		var pinned []string
-		for _, item := range s.Pinned {
-			pinned = append(pinned, fmt.Sprintf("- %s: %s", item.Kind, item.Value))
-		}
-		parts = append(parts, "Pinned memory:\n"+strings.Join(pinned, "\n"))
-	}
-	if len(s.Turns) > 0 {
-		start := 0
-		if len(s.Turns) > 6 {
-			start = len(s.Turns) - 6
-		}
-		var turns []string
-		for _, turn := range s.Turns[start:] {
-			turns = append(turns, fmt.Sprintf("- %s: %s", turn.Role, turn.Message))
-		}
-		parts = append(parts, "Recent turns:\n"+strings.Join(turns, "\n"))
-	}
-	if len(s.Events) > 0 {
-		start := 0
-		if len(s.Events) > 6 {
-			start = len(s.Events) - 6
-		}
-		var events []string
-		for _, event := range s.Events[start:] {
-			label := event.Kind
-			if event.Stage != "" {
-				label += "/" + event.Stage
-			}
-			if event.Actor != "" {
-				label += "@" + event.Actor
-			}
-			events = append(events, fmt.Sprintf("- %s: %s", label, event.Detail))
-		}
-		parts = append(parts, "Recent runtime events:\n"+strings.Join(events, "\n"))
+	if s.LastRunID != "" {
+		parts = append(parts, fmt.Sprintf("Last run ID: %s", s.LastRunID))
 	}
 	return strings.Join(parts, "\n\n")
 }

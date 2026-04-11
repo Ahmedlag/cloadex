@@ -60,7 +60,7 @@ func InitConfig() error {
 		return fmt.Errorf("config file already exists: %s", configPath)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := workspace.EnsurePrivateDir(filepath.Dir(path)); err != nil {
 		return err
 	}
 
@@ -79,7 +79,7 @@ func InitConfig() error {
 # Show detailed debug output (default: false)
 # verbose: false
 `
-	return os.WriteFile(path, []byte(content), 0o644)
+	return workspace.WritePrivateFile(path, []byte(content))
 }
 
 // parseSimpleYAML handles flat key: value YAML without a full parser dependency.

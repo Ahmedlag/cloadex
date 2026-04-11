@@ -331,3 +331,42 @@ func TestListRunsMigratesLegacyWorkspaceDir(t *testing.T) {
 		t.Fatalf("expected legacy .wizdo dir removed after migration, got %v", err)
 	}
 }
+
+func TestLoadRunRejectsInvalidRunID(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	if _, err := LoadRun("../../tmp"); err == nil {
+		t.Fatal("expected invalid run ID to be rejected")
+	}
+}
+
+func TestCreateRunUsesPrivatePermissions(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	manifest, err := CreateRun("sensitive prompt")
+	if err != nil {
+		t.Fatalf("CreateRun: %v", err)
+	}
+
+	dirInfo, err := os.Stat(filepath.Join(".cloadex", "runs", manifest.ID))
+	if err != nil {
+		t.Fatalf("stat run dir: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("run dir perms = %#o, want 0700", dirInfo.Mode().Perm())
+	}
+
+	fileInfo, err := os.Stat(filepath.Join(".cloadex", "runs", manifest.ID, "prompt.txt"))
+	if err != nil {
+		t.Fatalf("stat prompt: %v", err)
+	}
+	if fileInfo.Mode().Perm() != 0o600 {
+		t.Fatalf("prompt perms = %#o, want 0600", fileInfo.Mode().Perm())
+	}
+}

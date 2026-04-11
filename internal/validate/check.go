@@ -1,9 +1,11 @@
 package validate
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -17,6 +19,7 @@ type CheckResult struct {
 	Name     string
 	Command  string
 	Passed   bool
+	Skipped  bool
 	Output   string
 	Duration time.Duration
 }
@@ -32,7 +35,9 @@ func (cs *CheckSuite) Summary() string {
 	var sb strings.Builder
 	for _, r := range cs.Results {
 		status := "PASS"
-		if !r.Passed {
+		if r.Skipped {
+			status = "SKIP"
+		} else if !r.Passed {
 			status = "FAIL"
 		}
 		sb.WriteString(fmt.Sprintf("[%s] %s (%s, %s)\n", status, r.Name, r.Command, r.Duration.Round(time.Millisecond)))
@@ -68,19 +73,20 @@ func (cs *CheckSuite) FailedOutput() string {
 //  1. Auto-detected repo checks (go vet, go build, etc. based on project files)
 //  2. Task-level verification commands from the plan
 //  3. Any custom commands provided
-func RunChecks(ctx context.Context, tasks []plan.Task, customCmds []string) *CheckSuite {
+func RunChecks(ctx context.Context, tasks []plan.Task, customCmds []string, interactive bool) *CheckSuite {
 	suite := &CheckSuite{Passed: true}
 
 	// Collect all commands to run: auto-detected + task verifications + custom
 	type namedCmd struct {
-		name string
-		cmd  string
+		name    string
+		cmd     string
+		trusted bool
 	}
 	var commands []namedCmd
 
 	// Auto-detect repo-level checks
 	for _, c := range detectRepoChecks() {
-		commands = append(commands, namedCmd{name: c.name, cmd: c.cmd})
+		commands = append(commands, namedCmd{name: c.name, cmd: c.cmd, trusted: true})
 	}
 
 	// Task-level verification commands
@@ -116,20 +122,45 @@ func RunChecks(ctx context.Context, tasks []plan.Task, customCmds []string) *Che
 	ui.PrintSystem("Running %d verification check(s)...", len(deduped))
 
 	for _, nc := range deduped {
-		r := runCheck(ctx, nc.name, nc.cmd)
+		var r CheckResult
+		if nc.trusted {
+			r = runCheck(ctx, nc.name, nc.cmd)
+		} else {
+			r = runUntrustedCheck(ctx, nc.name, nc.cmd, interactive)
+		}
 		suite.Results = append(suite.Results, r)
-		if !r.Passed {
+		if !r.Passed && !r.Skipped {
 			suite.Passed = false
 		}
 
 		status := ui.SuccessColor + "PASS" + ui.Reset
-		if !r.Passed {
+		if r.Skipped {
+			status = ui.UserColor + "SKIP" + ui.Reset
+		} else if !r.Passed {
 			status = ui.ErrorColor + "FAIL" + ui.Reset
 		}
 		ui.PrintSystem("  [%s] %s (%s)", status, nc.name, r.Duration.Round(time.Millisecond))
 	}
 
 	return suite
+}
+
+var approveVerificationCommand = func(name, command string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		ui.PrintSystem("Approve verification command for %s?", name)
+		fmt.Printf("  %s\n", command)
+		fmt.Printf("  %s[y]%s Run  %s[n]%s Skip\n\n  > ", ui.SuccessColor, ui.Reset, ui.ErrorColor, ui.Reset)
+		input, _ := reader.ReadString('\n')
+		switch strings.TrimSpace(strings.ToLower(input)) {
+		case "y", "yes":
+			return true
+		case "n", "no", "":
+			return false
+		default:
+			ui.PrintError("Invalid choice. Please enter y or n.")
+		}
+	}
 }
 
 // runCheck executes a single shell command and captures the result.
@@ -159,6 +190,31 @@ func runCheck(ctx context.Context, name, command string) CheckResult {
 		Output:   strings.TrimSpace(output),
 		Duration: duration,
 	}
+}
+
+func runUntrustedCheck(ctx context.Context, name, command string, interactive bool) CheckResult {
+	start := time.Now()
+	if !interactive {
+		return CheckResult{
+			Name:     name,
+			Command:  command,
+			Passed:   true,
+			Skipped:  true,
+			Output:   "Skipped untrusted verification command in non-interactive mode.",
+			Duration: time.Since(start),
+		}
+	}
+	if !approveVerificationCommand(name, command) {
+		return CheckResult{
+			Name:     name,
+			Command:  command,
+			Passed:   true,
+			Skipped:  true,
+			Output:   "Skipped untrusted verification command by user choice.",
+			Duration: time.Since(start),
+		}
+	}
+	return runCheck(ctx, name, command)
 }
 
 type repoCheck struct {

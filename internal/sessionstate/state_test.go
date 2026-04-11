@@ -34,16 +34,22 @@ func TestLoadOrInitCreatesState(t *testing.T) {
 func TestSummaryForPrompt(t *testing.T) {
 	state := &State{
 		RepoSummary:   "repo",
-		ActiveGoal:    "goal",
+		Mode:          ModeReview,
+		LastRunID:     "20260411-120000",
 		AgentSessions: map[string]runner.SessionSnapshot{},
 	}
 	state.Pin("approved_plan", "ship feature")
 	state.RecordTurn("user", "fix auth")
 	state.RecordEvent("observer_warn", "execution", "codex", "suspicious drift")
 	summary := state.SummaryForPrompt()
-	for _, want := range []string{"repo", "goal", "approved_plan", "fix auth", "observer_warn"} {
+	for _, want := range []string{"repo", "review", "20260411-120000"} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{"approved_plan", "fix auth", "observer_warn", "ship feature"} {
+		if strings.Contains(summary, unwanted) {
+			t.Fatalf("summary should not replay detailed history, found %q in %q", unwanted, summary)
 		}
 	}
 }
@@ -108,5 +114,38 @@ func TestLoadOrInitMigratesLegacySessionFile(t *testing.T) {
 	}
 	if _, err := os.Stat(".wizdo"); !os.IsNotExist(err) {
 		t.Fatalf("expected legacy .wizdo dir removed after migration, got %v", err)
+	}
+}
+
+func TestSaveUsesPrivatePermissions(t *testing.T) {
+	tmp := t.TempDir()
+	orig, _ := os.Getwd()
+	_ = os.Chdir(tmp)
+	defer os.Chdir(orig)
+
+	state := &State{
+		Version:       1,
+		RepoPath:      tmp,
+		Mode:          ModeChat,
+		AgentSessions: map[string]runner.SessionSnapshot{},
+	}
+	if err := Save(state); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	dirInfo, err := os.Stat(".cloadex")
+	if err != nil {
+		t.Fatalf("stat dir: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("dir perms = %#o, want 0700", dirInfo.Mode().Perm())
+	}
+
+	fileInfo, err := os.Stat(SessionFilePath())
+	if err != nil {
+		t.Fatalf("stat session file: %v", err)
+	}
+	if fileInfo.Mode().Perm() != 0o600 {
+		t.Fatalf("session file perms = %#o, want 0600", fileInfo.Mode().Perm())
 	}
 }

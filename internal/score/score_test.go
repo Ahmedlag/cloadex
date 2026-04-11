@@ -39,4 +39,20 @@ func TestAddPointAndLabel(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(home, ".cloadex", "scoreboard.json")); err != nil {
 		t.Fatalf("scoreboard file not created: %v", err)
 	}
+
+	dirInfo, err := os.Stat(filepath.Join(home, ".cloadex"))
+	if err != nil {
+		t.Fatalf("scoreboard dir not created: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("scoreboard dir perms = %#o, want 0700", dirInfo.Mode().Perm())
+	}
+
+	fileInfo, err := os.Stat(filepath.Join(home, ".cloadex", "scoreboard.json"))
+	if err != nil {
+		t.Fatalf("scoreboard file not created: %v", err)
+	}
+	if fileInfo.Mode().Perm() != 0o600 {
+		t.Fatalf("scoreboard file perms = %#o, want 0600", fileInfo.Mode().Perm())
+	}
 }

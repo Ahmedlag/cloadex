@@ -59,7 +59,7 @@ func Run(ctx context.Context, planText string, opts Options) (*ValidationResult,
 	for attempt := 0; ; attempt++ {
 		ui.Divider()
 		ui.PrintSystem("Running deterministic verification...")
-		suite := RunChecks(ctx, executableTasks(result.Execution, opts.Tasks), opts.CustomChecks)
+		suite := RunChecks(ctx, executableTasks(result.Execution, opts.Tasks), opts.CustomChecks, opts.Interactive)
 		result.CheckSuite = suite
 
 		if suite.Passed {

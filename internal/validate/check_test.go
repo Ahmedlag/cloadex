@@ -106,7 +106,11 @@ func TestCheckSuite_EmptyPassesByDefault(t *testing.T) {
 }
 
 func TestRunChecks_CustomCommands(t *testing.T) {
-	suite := RunChecks(context.Background(), nil, []string{"echo custom_ok", "false"})
+	origApprove := approveVerificationCommand
+	defer func() { approveVerificationCommand = origApprove }()
+	approveVerificationCommand = func(_, _ string) bool { return true }
+
+	suite := RunChecks(context.Background(), nil, []string{"echo custom_ok", "false"}, true)
 
 	if suite.Passed {
 		t.Error("suite should fail because 'false' fails")
@@ -134,13 +138,17 @@ func TestRunChecks_CustomCommands(t *testing.T) {
 }
 
 func TestRunChecks_TaskVerificationCommands(t *testing.T) {
+	origApprove := approveVerificationCommand
+	defer func() { approveVerificationCommand = origApprove }()
+	approveVerificationCommand = func(_, _ string) bool { return true }
+
 	tasks := []plan.Task{
 		{OwnerAI: runner.Claude, Description: "task 1", Verification: "echo task1_ok"},
 		{OwnerAI: runner.Codex, Description: "task 2"}, // No verification
 		{OwnerAI: runner.Claude, Description: "task 3", Verification: "echo task3_ok"},
 	}
 
-	suite := RunChecks(context.Background(), tasks, nil)
+	suite := RunChecks(context.Background(), tasks, nil, true)
 
 	// Should have results from auto-detect + task verifications
 	var found int
@@ -158,12 +166,16 @@ func TestRunChecks_TaskVerificationCommands(t *testing.T) {
 }
 
 func TestRunChecks_Deduplication(t *testing.T) {
+	origApprove := approveVerificationCommand
+	defer func() { approveVerificationCommand = origApprove }()
+	approveVerificationCommand = func(_, _ string) bool { return true }
+
 	tasks := []plan.Task{
 		{OwnerAI: runner.Claude, Verification: "echo dup"},
 		{OwnerAI: runner.Claude, Verification: "echo dup"},
 	}
 
-	suite := RunChecks(context.Background(), tasks, []string{"echo dup"})
+	suite := RunChecks(context.Background(), tasks, []string{"echo dup"}, true)
 
 	count := 0
 	for _, r := range suite.Results {
@@ -173,5 +185,66 @@ func TestRunChecks_Deduplication(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("expected deduplication to produce 1 result for 'echo dup', got %d", count)
+	}
+}
+
+func TestRunChecks_SkipsUntrustedCommandsWhenNonInteractive(t *testing.T) {
+	origApprove := approveVerificationCommand
+	defer func() { approveVerificationCommand = origApprove }()
+	approveVerificationCommand = func(_, _ string) bool {
+		t.Fatal("approval prompt should not run in non-interactive mode")
+		return false
+	}
+
+	suite := RunChecks(context.Background(), nil, []string{"echo should_not_run"}, false)
+	if !suite.Passed {
+		t.Fatal("suite should remain passing when untrusted commands are skipped")
+	}
+	if len(suite.Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(suite.Results))
+	}
+	if !suite.Results[0].Skipped {
+		t.Fatal("expected command to be skipped")
+	}
+	if !strings.Contains(strings.ToLower(suite.Results[0].Output), "skipped") {
+		t.Fatalf("expected skip explanation, got %q", suite.Results[0].Output)
+	}
+}
+
+func TestRunChecks_ApprovesUntrustedCommandsInteractively(t *testing.T) {
+	origApprove := approveVerificationCommand
+	defer func() { approveVerificationCommand = origApprove }()
+
+	calls := 0
+	approveVerificationCommand = func(_, command string) bool {
+		calls++
+		return command == "echo approved"
+	}
+
+	suite := RunChecks(context.Background(), []plan.Task{
+		{OwnerAI: runner.Claude, Verification: "echo approved"},
+		{OwnerAI: runner.Codex, Verification: "echo denied"},
+	}, nil, true)
+
+	if calls != 2 {
+		t.Fatalf("expected 2 approval prompts, got %d", calls)
+	}
+	var approved, denied bool
+	for _, result := range suite.Results {
+		switch result.Command {
+		case "echo approved":
+			approved = true
+			if result.Skipped || !result.Passed {
+				t.Fatalf("approved command should run successfully: %#v", result)
+			}
+		case "echo denied":
+			denied = true
+			if !result.Skipped {
+				t.Fatalf("denied command should be skipped: %#v", result)
+			}
+		}
+	}
+	if !approved || !denied {
+		t.Fatalf("missing expected results: approved=%v denied=%v", approved, denied)
 	}
 }

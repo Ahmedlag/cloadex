@@ -57,12 +57,12 @@ func CreateRun(prompt string) (*RunManifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := workspace.EnsurePrivateDir(dir); err != nil {
 		return nil, fmt.Errorf("create run dir: %w", err)
 	}
 
 	// Write prompt file (for backwards compat with ListRuns/LoadRun).
-	if err := os.WriteFile(filepath.Join(dir, "prompt.txt"), []byte(prompt), 0o644); err != nil {
+	if err := workspace.WritePrivateFile(filepath.Join(dir, "prompt.txt"), []byte(prompt)); err != nil {
 		return nil, fmt.Errorf("write prompt: %w", err)
 	}
 
@@ -132,12 +132,12 @@ func SavePlanArtifacts(id, planText, debateHistory string) error {
 		return err
 	}
 	if planText != "" {
-		if err := os.WriteFile(filepath.Join(dir, "plan.md"), []byte(planText), 0o644); err != nil {
+		if err := workspace.WritePrivateFile(filepath.Join(dir, "plan.md"), []byte(planText)); err != nil {
 			return fmt.Errorf("write plan: %w", err)
 		}
 	}
 	if debateHistory != "" {
-		if err := os.WriteFile(filepath.Join(dir, "debate.md"), []byte(debateHistory), 0o644); err != nil {
+		if err := workspace.WritePrivateFile(filepath.Join(dir, "debate.md"), []byte(debateHistory)); err != nil {
 			return fmt.Errorf("write debate: %w", err)
 		}
 	}
@@ -153,7 +153,7 @@ func SaveExecutionArtifact(id, execOutput string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "execution.md"), []byte(execOutput), 0o644)
+	return workspace.WritePrivateFile(filepath.Join(dir, "execution.md"), []byte(execOutput))
 }
 
 func SaveExecutionState(id string, data []byte) error {
@@ -161,7 +161,7 @@ func SaveExecutionState(id string, data []byte) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "execution-state.json"), data, 0o644)
+	return workspace.WritePrivateFile(filepath.Join(dir, "execution-state.json"), data)
 }
 
 func LoadExecutionState(id string) ([]byte, error) {
@@ -181,15 +181,16 @@ func SaveValidationArtifact(id, valOutput string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "validation.md"), []byte(valOutput), 0o644)
+	return workspace.WritePrivateFile(filepath.Join(dir, "validation.md"), []byte(valOutput))
 }
 
 // LoadManifest reads the status.json for a given run ID.
 func LoadManifest(id string) (*RunManifest, error) {
-	path, err := workspace.Path("runs", id, "status.json")
+	dir, err := runDir(id)
 	if err != nil {
 		return nil, err
 	}
+	path := filepath.Join(dir, "status.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("load manifest %s: %w", id, err)
@@ -248,5 +249,5 @@ func writeManifest(dir string, m *RunManifest) error {
 	if err != nil {
 		return fmt.Errorf("marshal manifest: %w", err)
 	}
-	return os.WriteFile(filepath.Join(dir, "status.json"), data, 0o644)
+	return workspace.WritePrivateFile(filepath.Join(dir, "status.json"), data)
 }

@@ -37,3 +37,30 @@ func TestLoadFileMigratesLegacyConfig(t *testing.T) {
 		t.Fatalf("expected legacy .wizdo dir removed after migration, got %v", err)
 	}
 }
+
+func TestInitConfigUsesPrivatePermissions(t *testing.T) {
+	tmp := t.TempDir()
+	orig, _ := os.Getwd()
+	_ = os.Chdir(tmp)
+	defer os.Chdir(orig)
+
+	if err := InitConfig(); err != nil {
+		t.Fatalf("InitConfig: %v", err)
+	}
+
+	dirInfo, err := os.Stat(".cloadex")
+	if err != nil {
+		t.Fatalf("stat dir: %v", err)
+	}
+	if dirInfo.Mode().Perm() != 0o700 {
+		t.Fatalf("dir perms = %#o, want 0700", dirInfo.Mode().Perm())
+	}
+
+	fileInfo, err := os.Stat(filepath.Join(".cloadex", "config.yaml"))
+	if err != nil {
+		t.Fatalf("stat config: %v", err)
+	}
+	if fileInfo.Mode().Perm() != 0o600 {
+		t.Fatalf("config perms = %#o, want 0600", fileInfo.Mode().Perm())
+	}
+}
