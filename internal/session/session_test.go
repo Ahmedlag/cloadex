@@ -21,6 +21,34 @@ func TestExitTerminatesLoop(t *testing.T) {
 	}
 }
 
+func TestBareExitTerminatesLoop(t *testing.T) {
+	in := strings.NewReader("exit\n")
+	var out bytes.Buffer
+
+	s := &Session{In: in, Out: &out}
+	if err := s.Run(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "Goodbye!") {
+		t.Error("expected goodbye message on bare exit")
+	}
+}
+
+func TestBareQuitTerminatesLoop(t *testing.T) {
+	in := strings.NewReader("quit\n")
+	var out bytes.Buffer
+
+	s := &Session{In: in, Out: &out}
+	if err := s.Run(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "Goodbye!") {
+		t.Error("expected goodbye message on bare quit")
+	}
+}
+
 func TestEOFTerminatesLoop(t *testing.T) {
 	in := strings.NewReader("") // immediate EOF
 	var out bytes.Buffer

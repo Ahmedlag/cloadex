@@ -1,8 +1,12 @@
 package cmd
 
 import (
+	"os"
 	"strings"
 	"testing"
+	"time"
+	"sync/atomic"
+	"syscall"
 
 	"github.com/Ahmedlag/cloadex/internal/config"
 	"github.com/Ahmedlag/cloadex/internal/execute"
@@ -349,5 +353,32 @@ func TestVersionString(t *testing.T) {
 	// The version variable should have a default value.
 	if version == "" {
 		t.Error("version should not be empty")
+	}
+}
+
+func TestSignalLoopHandlesSingleInterrupt(t *testing.T) {
+	sigCh := make(chan os.Signal, 2)
+	done := make(chan struct{})
+	var calls atomic.Int32
+
+	finished := make(chan struct{})
+	go func() {
+		signalLoop(sigCh, done, func() {
+			calls.Add(1)
+		})
+		close(finished)
+	}()
+
+	sigCh <- syscall.SIGINT
+	sigCh <- syscall.SIGINT
+
+	select {
+	case <-finished:
+	case <-time.After(2 * time.Second):
+		t.Fatal("signalLoop did not exit after first interrupt")
+	}
+
+	if calls.Load() != 1 {
+		t.Fatalf("expected one interrupt callback, got %d", calls.Load())
 	}
 }

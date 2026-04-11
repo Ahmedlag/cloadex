@@ -78,6 +78,11 @@ func (s *Session) Run() error {
 			continue
 		}
 
+		if isExitInput(line) {
+			fmt.Fprintln(out, "Goodbye!")
+			return nil
+		}
+
 		if strings.HasPrefix(line, "/") {
 			command, args := parseCommand(line)
 			switch command {
@@ -113,6 +118,15 @@ func (s *Session) Run() error {
 				fmt.Fprintf(out, "Error: %s\n", err)
 			}
 		}
+	}
+}
+
+func isExitInput(line string) bool {
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "exit", "quit":
+		return true
+	default:
+		return false
 	}
 }
 

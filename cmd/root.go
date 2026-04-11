@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -100,24 +101,39 @@ func (rc *runContext) interrupt() {
 // startSignalHandler starts a single goroutine that listens for SIGINT/SIGTERM
 // and interrupts the given runContext. Returns a cleanup function that stops
 // signal delivery and terminates the goroutine.
-func startSignalHandler(rc *runContext) func() {
+func startSignalHandler(rc *runContext, extraInterrupt func()) func() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	done := make(chan struct{})
+	var once sync.Once
+	stop := func() {
+		once.Do(func() {
+			signal.Stop(sigCh)
+			close(done)
+		})
+	}
 	go func() {
-		for {
-			select {
-			case <-sigCh:
-				ui.PrintSystem("Interrupted — shutting down...")
-				rc.interrupt()
-			case <-done:
-				return
+		signalLoop(sigCh, done, func() {
+			ui.PrintSystem("Interrupted — shutting down...")
+			rc.interrupt()
+			if extraInterrupt != nil {
+				extraInterrupt()
 			}
-		}
+			stop()
+		})
 	}()
 	return func() {
-		signal.Stop(sigCh)
-		close(done)
+		stop()
+	}
+}
+
+func signalLoop(sigCh <-chan os.Signal, done <-chan struct{}, onInterrupt func()) {
+	select {
+	case <-sigCh:
+		if onInterrupt != nil {
+			onInterrupt()
+		}
+	case <-done:
 	}
 }
 
@@ -176,7 +192,7 @@ func executeWithArgs(args []string) error {
 	}
 
 	rc := &runContext{}
-	cleanup := startSignalHandler(rc)
+	cleanup := startSignalHandler(rc, nil)
 	defer cleanup()
 
 	ctx, setRunID := rc.begin()
@@ -198,8 +214,6 @@ func dispatchNoArgs() error {
 // cmdSession starts an interactive REPL session.
 func cmdSession() error {
 	rc := &runContext{}
-	cleanup := startSignalHandler(rc)
-	defer cleanup()
 
 	state, err := sessionstate.LoadOrInit()
 	if err != nil {
@@ -253,10 +267,19 @@ func cmdSession() error {
 		saveAgentSessions(state, agentSessions)
 		return err
 	}
+	if sess.In == nil {
+		sess.In = os.Stdin
+	}
 	sess.PromptRenderer = func() string {
-		return fmt.Sprintf("cloadex[%s]> ", state.Mode)
+		return ui.SessionPrompt(string(state.Mode))
 	}
 	sess.Header = sessionHeader(state)
+	cleanup := startSignalHandler(rc, func() {
+		if closer, ok := sess.In.(io.Closer); ok {
+			_ = closer.Close()
+		}
+	})
+	defer cleanup()
 	return sess.Run()
 }
 
@@ -845,21 +868,17 @@ func argsOrPrompt(input string) string {
 
 func sessionHeader(state *sessionstate.State) string {
 	refreshAILabels()
-	var lines []string
-	lines = append(lines, "cloadex live session")
-	if state.RepoPath != "" {
-		lines = append(lines, fmt.Sprintf("Repo: %s", state.RepoPath))
+	repo := ""
+	if state != nil && state.RepoPath != "" {
+		repo = filepath.Base(state.RepoPath)
 	}
-	if state.Branch != "" {
-		lines = append(lines, fmt.Sprintf("Branch: %s", state.Branch))
+	branch := ""
+	mode := ""
+	if state != nil {
+		branch = state.Branch
+		mode = string(state.Mode)
 	}
-	lines = append(lines, fmt.Sprintf("Mode: %s", state.Mode))
-	lines = append(lines, score.Label(runner.Claude))
-	lines = append(lines, score.Label(runner.Codex))
-	if state.RepoSummary != "" {
-		lines = append(lines, state.RepoSummary)
-	}
-	return strings.Join(lines, "\n") + "\n"
+	return ui.SessionHeader(repo, branch, mode, score.Label(runner.Claude), score.Label(runner.Codex))
 }
 
 func printGitDiffSummary() error {
@@ -1172,7 +1191,7 @@ func cmdResume() error {
 	ui.SetVerbose(opts.Verbose)
 
 	rc := &runContext{}
-	cleanup := startSignalHandler(rc)
+	cleanup := startSignalHandler(rc, nil)
 	defer cleanup()
 
 	ctx, setRunID := rc.begin()
