@@ -1,12 +1,15 @@
 package validate
 
 import (
+	"context"
+	"io"
 	"testing"
 
 	"github.com/Ahmedlag/cloadex/internal/execute"
 	"github.com/Ahmedlag/cloadex/internal/persist"
 	"github.com/Ahmedlag/cloadex/internal/plan"
 	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/session"
 )
 
 func TestExtractStatus(t *testing.T) {
@@ -110,5 +113,42 @@ func TestCollectIssuesIncludesExecutionFailures(t *testing.T) {
 	issues := collectIssues(execResult, nil, "All clear")
 	if len(issues) != 1 {
 		t.Fatalf("issues len = %d, want 1", len(issues))
+	}
+}
+
+func TestChooseBetweenUsesQuestionUI(t *testing.T) {
+	origAsk := askDecision
+	defer func() { askDecision = origAsk }()
+
+	askDecision = func(_ io.Reader, _ io.Writer, q session.Question) (string, error) {
+		if q.Mode != session.QuestionSingle {
+			t.Fatalf("mode = %s, want %s", q.Mode, session.QuestionSingle)
+		}
+		return "Choose claude", nil
+	}
+
+	decision := persist.PendingDecision{
+		Issue: "broken branch",
+		OptionOne: persist.ProposalOption{
+			AI:         runner.Claude,
+			Cause:      "cause a",
+			FixSummary: "fix a",
+		},
+		OptionTwo: persist.ProposalOption{
+			AI:         runner.Codex,
+			Cause:      "cause b",
+			FixSummary: "fix b",
+		},
+	}
+
+	chosen, pending, err := chooseBetween(context.Background(), "ws", "plan", "issue", decision, true)
+	if err != nil {
+		t.Fatalf("chooseBetween: %v", err)
+	}
+	if pending != nil {
+		t.Fatal("expected no pending decision")
+	}
+	if chosen == nil || chosen.AI != runner.Claude {
+		t.Fatalf("expected Claude choice, got %#v", chosen)
 	}
 }

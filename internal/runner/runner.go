@@ -367,7 +367,7 @@ func runOnce(ctx context.Context, ai AI, prompt string, onLine StreamCallback, t
 	wg.Wait()
 
 	if err := cmd.Wait(); err != nil {
-		return Result{AI: ai, Err: classifyExitError(ai, err, errOutput.String())}
+		return Result{AI: ai, Err: classifyExitError(ai, err, errOutput.String(), output.String())}
 	}
 
 	return Result{AI: ai, Output: strings.TrimSpace(output.String())}
@@ -399,8 +399,8 @@ func classifyStartError(ai AI, err error) *RunError {
 	return &RunError{AI: ai, Retryable: false, Cause: fmt.Errorf("start %s: %w", ai, err)}
 }
 
-// classifyExitError wraps a process-exit error with retryability info based on exit code and stderr.
-func classifyExitError(ai AI, err error, stderrText string) *RunError {
+// classifyExitError wraps a process-exit error with retryability info based on exit code and process output.
+func classifyExitError(ai AI, err error, stderrText string, outputText string) *RunError {
 	exitCode := -1
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
@@ -408,17 +408,18 @@ func classifyExitError(ai AI, err error, stderrText string) *RunError {
 	}
 
 	stderrText = strings.TrimSpace(stderrText)
-	if authMessage, ok := classifyAuthFailure(ai, stderrText); ok {
+	outputText = strings.TrimSpace(outputText)
+	if knownMessage, knownCause, ok := classifyKnownFailure(ai, stderrText, outputText); ok {
 		return &RunError{
 			AI:        ai,
 			Retryable: false,
 			ExitCode:  exitCode,
-			Stderr:    authMessage,
-			Cause:     errors.New("authentication required"),
+			Stderr:    knownMessage,
+			Cause:     errors.New(knownCause),
 		}
 	}
 
-	retryable := isRetryableFailure(exitCode, stderrText)
+	retryable := isRetryableFailure(exitCode, stderrText+"\n"+outputText)
 
 	return &RunError{
 		AI:        ai,
@@ -429,26 +430,34 @@ func classifyExitError(ai AI, err error, stderrText string) *RunError {
 	}
 }
 
-func classifyAuthFailure(ai AI, stderr string) (string, bool) {
-	lower := strings.ToLower(stderr)
+func classifyKnownFailure(ai AI, stderr string, output string) (message string, cause string, ok bool) {
+	combined := strings.ToLower(strings.TrimSpace(stderr + "\n" + output))
 	switch ai {
 	case Codex:
-		if strings.Contains(lower, "invalid refresh token") ||
-			strings.Contains(lower, "invalid_grant") ||
-			strings.Contains(lower, "tokenrefreshfailed") {
-			return "Codex authentication expired. Run `codex logout` and `codex login`, then try again.", true
+		if strings.Contains(combined, "invalid refresh token") ||
+			strings.Contains(combined, "invalid_grant") ||
+			strings.Contains(combined, "tokenrefreshfailed") {
+			return "Codex authentication expired. Run `codex logout` and `codex login`, then try again.", "authentication required", true
 		}
-		if strings.Contains(lower, "authentication error") ||
-			strings.Contains(lower, "not logged in") {
-			return "Codex authentication is required. Run `codex login`, then try again.", true
+		if strings.Contains(combined, "authentication error") ||
+			strings.Contains(combined, "not logged in") {
+			return "Codex authentication is required. Run `codex login`, then try again.", "authentication required", true
 		}
 	case Claude:
-		if strings.Contains(lower, "authentication error") ||
-			strings.Contains(lower, "not logged in") {
-			return "Claude authentication is required. Run `claude login`, then try again.", true
+		if strings.Contains(combined, ".claude/session-env") &&
+			(strings.Contains(combined, "eperm") ||
+				strings.Contains(combined, "operation not permitted") ||
+				strings.Contains(combined, "permission denied")) {
+			return "Claude could not write to ~/.claude/session-env. Fix local permissions for ~/.claude, then run `claude auth login` if needed.", "local permissions required", true
+		}
+		if strings.Contains(combined, "authentication_failed") ||
+			strings.Contains(combined, "not logged in") ||
+			strings.Contains(combined, "please run /login") ||
+			strings.Contains(combined, "authentication error") {
+			return "Claude authentication is required. Run `claude auth login`, then try again.", "authentication required", true
 		}
 	}
-	return "", false
+	return "", "", false
 }
 
 // isRetryableFailure determines if a failure is transient and worth retrying.

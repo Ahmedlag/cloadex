@@ -350,25 +350,17 @@ func runChat(ctx context.Context, userPrompt string, state *sessionstate.State) 
 		summary = state.SummaryForPrompt()
 	}
 	ui.PrintSystem("CHAT mode is read-only.")
-	spinner := ui.NewSpinner("CHAT thinking…")
-	var spinnerOnce sync.Once
-	stopSpinner := func() {
-		spinnerOnce.Do(func() {
-			spinner.Stop("")
-		})
-	}
-	result := runner.Run(ctx, runner.Codex, prompt.ChatSession(wsContext, summary, userPrompt), func(ai runner.AI, line string) {
-		stopSpinner()
-		ui.StreamCodex(line)
-	})
-	stopSpinner()
-	if result.Err != nil {
-		return result.Err
-	}
 	if state != nil {
 		state.ActiveGoal = userPrompt
 		state.RecordTurn("user", userPrompt)
-		state.RecordTurn("chat", truncateForMemory(result.Output))
+		_ = sessionstate.Save(state)
+	}
+	output, err := runQuestionAwareConversation(ctx, runner.Codex, "CHAT", prompt.ChatSession(wsContext, summary, userPrompt), state)
+	if err != nil {
+		return err
+	}
+	if state != nil {
+		state.RecordTurn("chat", truncateForMemory(output))
 		state.RecordEvent("phase_complete", "chat", "codex", "Chat response completed.")
 		return sessionstate.Save(state)
 	}
@@ -386,30 +378,64 @@ func runPlanning(ctx context.Context, userPrompt string, state *sessionstate.Sta
 		summary = state.SummaryForPrompt()
 	}
 	ui.PrintSystem("PLANNING mode is read-only.")
-	spinner := ui.NewSpinner("PLANNING thinking…")
-	var spinnerOnce sync.Once
-	stopSpinner := func() {
-		spinnerOnce.Do(func() {
-			spinner.Stop("")
-		})
-	}
-	result := runner.Run(ctx, runner.Claude, prompt.PlanningSession(wsContext, summary, userPrompt), func(ai runner.AI, line string) {
-		stopSpinner()
-		ui.StreamClaude(line)
-	})
-	stopSpinner()
-	if result.Err != nil {
-		return result.Err
-	}
 	if state != nil {
 		state.ActiveGoal = userPrompt
-		state.LastPlan = result.Output
 		state.RecordTurn("user", userPrompt)
-		state.RecordTurn("planning", truncateForMemory(result.Output))
+		_ = sessionstate.Save(state)
+	}
+	output, err := runQuestionAwareConversation(ctx, runner.Claude, "PLANNING", prompt.PlanningSession(wsContext, summary, userPrompt), state)
+	if err != nil {
+		return err
+	}
+	if state != nil {
+		state.LastPlan = output
+		state.RecordTurn("planning", truncateForMemory(output))
 		state.RecordEvent("phase_complete", "planning", "claude", "Planning response completed.")
 		return sessionstate.Save(state)
 	}
 	return nil
+}
+
+func runQuestionAwareConversation(ctx context.Context, ai runner.AI, label string, initialPrompt string, state *sessionstate.State) (string, error) {
+	currentPrompt := initialPrompt
+	for {
+		spinner := ui.NewSpinner(label + " thinking…")
+		var spinnerOnce sync.Once
+		stopSpinner := func() {
+			spinnerOnce.Do(func() {
+				spinner.Stop("")
+			})
+		}
+
+		result := runner.Run(ctx, ai, currentPrompt, func(_ runner.AI, line string) {
+			stopSpinner()
+			if ai == runner.Claude {
+				ui.StreamClaude(line)
+				return
+			}
+			ui.StreamCodex(line)
+		})
+		stopSpinner()
+		if result.Err != nil {
+			return "", result.Err
+		}
+
+		if question, ok := session.ParseQuestion(result.Output); ok {
+			answer, err := session.AskQuestion(os.Stdin, os.Stdout, *question)
+			if err != nil {
+				return "", err
+			}
+			ui.PrintUser("%s", answer)
+			if state != nil {
+				state.RecordTurn("user", answer)
+				_ = sessionstate.Save(state)
+			}
+			currentPrompt = prompt.QuestionAnswer(answer)
+			continue
+		}
+
+		return result.Output, nil
+	}
 }
 
 func runWithState(ctx context.Context, userPrompt string, opts config.Options, setRunID func(string), state *sessionstate.State) error {

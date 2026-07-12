@@ -44,7 +44,9 @@ RULES:
 2. You may inspect and explain the repository, architecture, and code paths.
 3. Do not modify files, propose that changes were applied, or act as if code was executed.
 4. If the user asks for implementation, explain that EXECUTION mode is required.
-5. Be concise and practical.`, wsContext, emptyFallback(sessionSummary, "No prior session summary."), userPrompt)
+5. If you need clarification, output ONLY a JSON object with this schema:
+   {"kind":"question","mode":"single"|"multi"|"text","prompt":"...","options":["..."],"allow_custom":true,"placeholder":"optional"}
+6. Be concise and practical.`, wsContext, emptyFallback(sessionSummary, "No prior session summary."), userPrompt)
 }
 
 func PlanningSession(wsContext string, sessionSummary string, userPrompt string) string {
@@ -65,7 +67,13 @@ RULES:
 3. Do not modify files or claim that code was changed.
 4. If key information is missing, ask the smallest high-value follow-up question first.
 5. When enough context exists, produce a concrete step-by-step plan.
-6. If the user asks to apply changes, explain that EXECUTION mode is required.`, wsContext, emptyFallback(sessionSummary, "No prior session summary."), userPrompt)
+6. If you need clarification, output ONLY a JSON object with this schema:
+   {"kind":"question","mode":"single"|"multi"|"text","prompt":"...","options":["..."],"allow_custom":true,"placeholder":"optional"}
+7. If the user asks to apply changes, explain that EXECUTION mode is required.`, wsContext, emptyFallback(sessionSummary, "No prior session summary."), userPrompt)
+}
+
+func QuestionAnswer(answer string) string {
+	return fmt.Sprintf("User answer: %s\nContinue from there.", strings.TrimSpace(answer))
 }
 
 // detectGitBranch uses git rev-parse to reliably get the current branch name.

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/session"
 	"github.com/Ahmedlag/cloadex/internal/ui"
 )
 
@@ -45,6 +46,8 @@ type Plan struct {
 	Overview string `json:"overview"`
 	Tasks    []Task `json:"tasks"`
 }
+
+var askQuestion = session.AskQuestion
 
 // ParsePlan tries to extract a structured Plan from the debate output.
 // It first attempts JSON parsing, then falls back to markdown heuristics.
@@ -222,25 +225,29 @@ func Present(planText string, autoApprove bool) (Decision, string) {
 		return Approve, planText
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-
 	for {
-		ui.PrintSystem("Do you approve this plan?")
-		fmt.Printf("  %s[a]%s Approve  %s[e]%s Edit  %s[r]%s Reject & restart debate\n",
-			ui.SuccessColor, ui.Reset,
-			ui.UserColor, ui.Reset,
-			ui.ErrorColor, ui.Reset)
-		fmt.Printf("\n  > ")
-
-		input, _ := reader.ReadString('\n')
+		input, err := askQuestion(os.Stdin, os.Stdout, session.Question{
+			Kind:   "question",
+			Mode:   session.QuestionSingle,
+			Prompt: "What should cloadex do with this plan?",
+			Options: []string{
+				"Approve",
+				"Edit",
+				"Reject and restart debate",
+			},
+		})
+		if err != nil {
+			return Reject, ""
+		}
 		input = strings.TrimSpace(strings.ToLower(input))
 
 		switch input {
-		case "a", "approve", "yes", "y":
+		case "approve":
 			ui.PrintSuccess("Plan approved!")
 			return Approve, planText
 
-		case "e", "edit":
+		case "edit":
+			reader := bufio.NewReader(os.Stdin)
 			ui.PrintSystem("Enter your edits (type END on a new line when done):")
 			var edits strings.Builder
 			for {
@@ -254,12 +261,12 @@ func Present(planText string, autoApprove bool) (Decision, string) {
 			ui.PrintSuccess("Edits recorded. Proceeding with modified plan.")
 			return Edit, editedPlan
 
-		case "r", "reject", "no", "n":
+		case "reject and restart debate":
 			ui.PrintError("Plan rejected. Restarting debate...")
 			return Reject, ""
 
 		default:
-			ui.PrintError("Invalid choice. Please enter a, e, or r.")
+			ui.PrintError("Invalid choice.")
 		}
 	}
 }

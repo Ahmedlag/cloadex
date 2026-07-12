@@ -1,7 +1,6 @@
 package validate
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"github.com/Ahmedlag/cloadex/internal/plan"
 	"github.com/Ahmedlag/cloadex/internal/prompt"
 	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/session"
 	"github.com/Ahmedlag/cloadex/internal/ui"
 )
 
@@ -45,6 +45,7 @@ type issue struct {
 }
 
 var runAI = runner.Run
+var askDecision = session.AskQuestion
 
 // Run performs deterministic checks, AI review, and the scoped fix loop.
 func Run(ctx context.Context, planText string, opts Options) (*ValidationResult, error) {
@@ -210,7 +211,6 @@ func chooseBetween(ctx context.Context, wsContext string, planText string, issue
 		return nil, &decision, nil
 	}
 
-	reader := bufio.NewReader(os.Stdin)
 	current := decision
 	for {
 		ui.Divider()
@@ -219,15 +219,25 @@ func chooseBetween(ctx context.Context, wsContext string, planText string, issue
 		fmt.Println()
 		fmt.Printf("1. %s\n   Cause: %s\n   Fix: %s\n\n", current.OptionOne.AI, current.OptionOne.Cause, current.OptionOne.FixSummary)
 		fmt.Printf("2. %s\n   Cause: %s\n   Fix: %s\n\n", current.OptionTwo.AI, current.OptionTwo.Cause, current.OptionTwo.FixSummary)
-		fmt.Print("Choose 1, 2, or 3 for a short mini debate: ")
-
-		input, _ := reader.ReadString('\n')
-		switch strings.TrimSpace(input) {
-		case "1":
+		answer, err := askDecision(os.Stdin, os.Stdout, session.Question{
+			Kind:   "question",
+			Mode:   session.QuestionSingle,
+			Prompt: "How should cloadex resolve this disagreement?",
+			Options: []string{
+				fmt.Sprintf("Choose %s", current.OptionOne.AI),
+				fmt.Sprintf("Choose %s", current.OptionTwo.AI),
+				"Run a short mini debate",
+			},
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		switch strings.TrimSpace(answer) {
+		case fmt.Sprintf("Choose %s", current.OptionOne.AI):
 			return &current.OptionOne, nil, nil
-		case "2":
+		case fmt.Sprintf("Choose %s", current.OptionTwo.AI):
 			return &current.OptionTwo, nil, nil
-		case "3":
+		case "Run a short mini debate":
 			updated, err := runMiniDebate(ctx, wsContext, planText, current)
 			if err != nil {
 				return nil, nil, err
@@ -238,7 +248,7 @@ func chooseBetween(ctx context.Context, wsContext string, planText string, issue
 			}
 			ui.PrintSystem("Mini debate complete. The AIs still disagree; please choose 1 or 2.")
 		default:
-			ui.PrintError("Invalid choice. Enter 1, 2, or 3.")
+			ui.PrintError("Invalid choice.")
 		}
 	}
 }

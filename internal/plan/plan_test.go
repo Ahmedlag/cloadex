@@ -1,10 +1,12 @@
 package plan
 
 import (
+	"io"
 	"strings"
 	"testing"
 
 	"github.com/Ahmedlag/cloadex/internal/runner"
+	"github.com/Ahmedlag/cloadex/internal/session"
 )
 
 func TestParseJSON_StructuredPlan(t *testing.T) {
@@ -257,6 +259,28 @@ func TestIsHeadingOrLabel(t *testing.T) {
 				t.Errorf("isHeadingOrLabel(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestPresentApproveUsesQuestionUI(t *testing.T) {
+	origAsk := askQuestion
+	defer func() { askQuestion = origAsk }()
+
+	called := false
+	askQuestion = func(_ io.Reader, _ io.Writer, q session.Question) (string, error) {
+		called = true
+		if q.Mode != session.QuestionSingle {
+			t.Fatalf("mode = %s, want %s", q.Mode, session.QuestionSingle)
+		}
+		return "Approve", nil
+	}
+
+	decision, approved := Present("plan text", false)
+	if !called {
+		t.Fatal("expected question UI to be used")
+	}
+	if decision != Approve || approved != "plan text" {
+		t.Fatalf("got (%v, %q), want (Approve, %q)", decision, approved, "plan text")
 	}
 }
 

@@ -291,7 +291,7 @@ func TestClassifyStartError(t *testing.T) {
 }
 
 func TestClassifyExitError_CodexInvalidRefreshToken(t *testing.T) {
-	err := classifyExitError(Codex, errors.New("signal: killed"), `ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))`)
+	err := classifyExitError(Codex, errors.New("signal: killed"), `ERROR rmcp::transport::worker: worker quit with fatal: Transport channel closed, when Auth(TokenRefreshFailed("Server returned error response: invalid_grant: Invalid refresh token"))`, "")
 	if err.Retryable {
 		t.Fatal("auth failure should not be retryable")
 	}
@@ -304,9 +304,26 @@ func TestClassifyExitError_CodexInvalidRefreshToken(t *testing.T) {
 }
 
 func TestClassifyExitError_CodexNotLoggedIn(t *testing.T) {
-	err := classifyExitError(Codex, errors.New("exit status 1"), "authentication error: not logged in")
+	err := classifyExitError(Codex, errors.New("exit status 1"), "authentication error: not logged in", "")
 	if !strings.Contains(err.Error(), "codex login") {
 		t.Fatalf("expected codex login guidance, got: %s", err.Error())
+	}
+}
+
+func TestClassifyExitError_ClaudeNotLoggedInFromOutput(t *testing.T) {
+	err := classifyExitError(Claude, errors.New("signal: killed"), "", `{"type":"assistant","message":{"content":[{"type":"text","text":"Not logged in · Please run /login"}]},"error":"authentication_failed"}`)
+	if !strings.Contains(err.Error(), "claude auth login") {
+		t.Fatalf("expected Claude login guidance, got: %s", err.Error())
+	}
+}
+
+func TestClassifyExitError_ClaudeSessionEnvPermissions(t *testing.T) {
+	err := classifyExitError(Claude, errors.New("signal: killed"), "Failed to run: EPERM: operation not permitted, mkdir '/Users/ahmed/.claude/session-env/abc'", "")
+	if !strings.Contains(err.Error(), "~/.claude/session-env") {
+		t.Fatalf("expected Claude permissions guidance, got: %s", err.Error())
+	}
+	if !strings.Contains(err.Error(), "claude auth login") {
+		t.Fatalf("expected auth follow-up guidance in permissions message, got: %s", err.Error())
 	}
 }
 
