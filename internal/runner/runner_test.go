@@ -318,7 +318,7 @@ func TestClassifyExitError_ClaudeNotLoggedInFromOutput(t *testing.T) {
 }
 
 func TestClassifyExitError_ClaudeSessionEnvPermissions(t *testing.T) {
-	err := classifyExitError(Claude, errors.New("signal: killed"), "Failed to run: EPERM: operation not permitted, mkdir '/Users/ahmed/.claude/session-env/abc'", "")
+	err := classifyExitError(Claude, errors.New("signal: killed"), "Failed to run: EPERM: operation not permitted, mkdir '/Users/dev/.claude/session-env/abc'", "")
 	if !strings.Contains(err.Error(), "~/.claude/session-env") {
 		t.Fatalf("expected Claude permissions guidance, got: %s", err.Error())
 	}

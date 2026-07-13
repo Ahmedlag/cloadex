@@ -969,15 +969,17 @@ func argsOrPrompt(input string) string {
 
 func sessionHeader(state *sessionstate.State) string {
 	refreshAILabels()
-	repo := ""
-	if state != nil && state.RepoPath != "" {
-		repo = filepath.Base(state.RepoPath)
-	}
+	dir := ""
 	branch := ""
+	mode := string(sessionstate.ModeChat)
 	if state != nil {
+		dir = state.RepoPath
 		branch = state.Branch
+		if state.Mode != "" {
+			mode = string(state.Mode)
+		}
 	}
-	return ui.SessionHeader(repo, branch, score.Label(runner.Claude), score.Label(runner.Codex))
+	return ui.WelcomeBox(version, score.Label(runner.Claude), score.Label(runner.Codex), dir, branch, mode)
 }
 
 func printGitDiffSummary() error {

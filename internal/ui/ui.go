@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -147,29 +148,47 @@ func PhaseHeader(phase int, name string) {
 	fmt.Printf("%s%s%s%s\n\n", Dim, Muted, strings.Repeat("─", 28), Reset)
 }
 
-func SessionHeader(repo string, branch string, claude string, codex string) string {
-	var top []string
-	top = append(top, fmt.Sprintf("%s%scloadex%s", Bold, SystemColor, Reset))
-	if repo != "" {
-		top = append(top, fmt.Sprintf("%s%s%s", Bold, repo, Reset))
+// WelcomeBox renders the session start screen: a bordered banner with the
+// product name and version, followed by agent, directory, branch and mode
+// details plus a command hint.
+func WelcomeBox(version string, claude string, codex string, dir string, branch string, mode string) string {
+	const tagline = "Claude + Codex — better together"
+	title := fmt.Sprintf("◇ cloadex %s", version)
+
+	inner := utf8.RuneCountInString(title)
+	if w := utf8.RuneCountInString(tagline) + 2; w > inner {
+		inner = w
+	}
+	inner += 3 // breathing room inside the right border
+
+	var b strings.Builder
+	border := func(left, right string) {
+		fmt.Fprintf(&b, "%s%s%s%s%s\n", Muted, left, strings.Repeat("─", inner+2), right, Reset)
+	}
+	row := func(plain string, colored string) {
+		pad := strings.Repeat(" ", inner-utf8.RuneCountInString(plain))
+		fmt.Fprintf(&b, "%s│%s %s%s %s│%s\n", Muted, Reset, colored, pad, Muted, Reset)
+	}
+
+	border("╭", "╮")
+	row(title, fmt.Sprintf("%s◇ %scloadex%s %s%s%s", SystemColor, Bold, Reset, Dim, version, Reset))
+	row("  "+tagline, fmt.Sprintf("  %s%s%s", Dim, tagline, Reset))
+	border("╰", "╯")
+
+	detail := func(key string, value string) {
+		fmt.Fprintf(&b, "  %s%-10s%s %s\n", Muted, key+":", Reset, value)
+	}
+	detail("agents", fmt.Sprintf("%s%s%s  %s·%s  %s%s%s", ClaudeColor, claude, Reset, Muted, Reset, CodexColor, codex, Reset))
+	if dir != "" {
+		detail("directory", dir)
 	}
 	if branch != "" {
-		top = append(top, fmt.Sprintf("%s%s%s", Dim, branch, Reset))
+		detail("branch", fmt.Sprintf("%s%s%s", Dim, branch, Reset))
 	}
+	detail("mode", fmt.Sprintf("%s%s%s   %s(shift+tab to cycle)%s", Bold, strings.ToUpper(mode), Reset, Muted, Reset))
 
-	var bottom []string
-	if claude != "" {
-		bottom = append(bottom, fmt.Sprintf("%s%s", ClaudeColor, claude)+Reset)
-	}
-	if codex != "" {
-		bottom = append(bottom, fmt.Sprintf("%s%s", CodexColor, codex)+Reset)
-	}
-
-	header := strings.Join(top, "  ")
-	if len(bottom) > 0 {
-		header += "\n" + strings.Join(bottom, "  ")
-	}
-	return header + "\n"
+	fmt.Fprintf(&b, "\n  %s/help for commands · /exit to quit%s\n", Muted, Reset)
+	return b.String()
 }
 
 func SessionPrompt(mode string) string {
