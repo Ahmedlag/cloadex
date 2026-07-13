@@ -7,22 +7,22 @@ class Cloadex < Formula
   on_macos do
     on_arm do
       url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-darwin-arm64.tar.gz"
-      sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
+      sha256 "f5ded17b6d07772d9ec99344d560c16a4547483b18fa87112dd7c681fd22404b" # Run `make formula` to fill after release build
     end
     on_intel do
       url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-darwin-amd64.tar.gz"
-      sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
+      sha256 "9f9212e4c9d2adb21fc03b348167434ab3bd2a961f7c7c3e22aa48da8d27e8ab" # Run `make formula` to fill after release build
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-linux-arm64.tar.gz"
-      sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
+      sha256 "58eaf3f68fb654f41367e2e711884aa6b9e5faa7f40876b66224c80f05972f96" # Run `make formula` to fill after release build
     end
     on_intel do
       url "https://github.com/Ahmedlag/cloadex/releases/download/v#{version}/cloadex-linux-amd64.tar.gz"
-      sha256 "PLACEHOLDER" # Run `make formula` to fill after release build
+      sha256 "8f8c2d24fe38a6409d308591d6f035bf6dfb110fbad7daebaf9f91b4708d8662" # Run `make formula` to fill after release build
     end
   end
 

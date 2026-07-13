@@ -74,7 +74,15 @@ export PATH="$PATH:$(go env GOPATH)/bin"
 
 ### Homebrew (macOS / Linux)
 
-Homebrew packaging is not published yet. Until the tap exists, use the installer script above or install from source.
+```sh
+brew install ahmedlag/tap/cloadex
+```
+
+This installs a prebuilt binary from the latest GitHub release. To build from the current `main` instead:
+
+```sh
+brew install --HEAD ahmedlag/tap/cloadex
+```
 
 ### Windows
 
